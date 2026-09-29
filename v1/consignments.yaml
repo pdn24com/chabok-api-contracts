@@ -1,0 +1,1815 @@
+openapi: 3.1.0
+info:
+  title: Chabok Consignment API
+  version: 1.2.0
+  description: |
+    Consignment production vertical-slice contract derived from the governing
+    implementation baseline, current Product Owner instruction, ERS v1.7, and
+    the approved List/Create/Edit/Detail Option A designs. The five-operation
+    inventory and normalized multi-option legacy pricing boundary are approved
+    by the current slice instructions. Legacy wire-code mappings remain
+    deployment configuration and fail closed when required.
+    List v1.1 adds selected-node-scoped status-group totals and operational
+    node/driver identifiers required by the approved Consignment List states.
+    The production adapter uses injected rotated secrets only; it never exposes
+    provider tokens, credentials, URLs containing login input, or raw payloads.
+servers:
+  - url: /api/v1
+tags:
+  - name: Consignments
+    description: Tenant- and operational-scope-bound Consignment operations.
+  - name: Consignment Number Ranges
+    description: HQ-scoped administration of preprinted numeric Consignment inventory.
+security:
+  - bearerAuth: []
+paths:
+  /operational-statuses:
+    get:
+      operationId: listOperationalStatuses
+      summary: Visible global and tenant operational status catalogue, including inactive historical entries
+      tags: [Consignments]
+      responses:
+        '200':
+          description: Requires an operational view permission/entitlement; no cross-tenant catalogue entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, correlation_id]
+                properties:
+                  correlation_id: { type: string, format: uuid }
+                  data: { type: array, items: { $ref: '#/components/schemas/OperationalStatusEntry' } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createOperationalStatus
+      summary: Create global status as platform administrator or tenant status with operational_status.manage and tenant scope
+      tags: [Consignments]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/OperationalStatusFields'
+                - type: object
+                  required: [code, scope]
+                  properties:
+                    code: { $ref: '#/components/schemas/OperationalStatus' }
+                    scope: { type: string, enum: [GLOBAL, TENANT] }
+      responses:
+        '201':
+          description: Created; code immutable, no transition is granted by creation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationalStatusSuccess' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /operational-statuses/{id}:
+    patch:
+      operationId: updateOperationalStatus
+      tags: [Consignments]
+      summary: Update owned status metadata with immutable revision and audit; system workflow semantics are protected
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/OperationalStatusFields'
+                - type: object
+                  required: [expected_version]
+                  properties:
+                    expected_version: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Saved, or unchanged without creating another revision.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationalStatusSuccess' }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /consignments:
+    get:
+      tags: [Consignments]
+      operationId: listConsignments
+      summary: List visible Consignments in the active operational context
+      x-chabok-source: SCR-007, UF-011, ERS v1.7 E01/E02
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/StatusGroup'
+        - $ref: '#/components/parameters/PickupNodeId'
+        - $ref: '#/components/parameters/DeliveryNodeId'
+        - in: query
+          name: pickup_man_id
+          style: form
+          explode: false
+          description: Comma-separated selections (OR), AND with other filters; legacy scalar accepted; empty means unrestricted.
+          schema: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+        - in: query
+          name: delivery_man_id
+          style: form
+          explode: false
+          description: Comma-separated selections (OR), AND with other filters; legacy scalar accepted; empty means unrestricted.
+          schema: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+        - in: query
+          name: sla_risk
+          style: form
+          explode: false
+          description: Comma-separated selections (OR), AND with other filters; legacy scalar accepted; empty means unrestricted.
+          schema: { type: array, maxItems: 50, items: { type: string, enum: [OVERDUE, AT_RISK, ON_TIME, NO_COMMITMENT] } }
+
+        - $ref: '#/components/parameters/ServiceTypeId'
+        - $ref: '#/components/parameters/ShippingMethodId'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: Tenant- and scope-filtered page.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsignmentListSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags: [Consignments]
+      operationId: createConsignment
+      summary: Atomically create a Consignment from an accepted pricing quote
+      x-chabok-source: SCR-009, UF-001, ERS v1.7 E01/E02, current Product Owner instruction
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConsignmentRequest'
+      responses:
+        '201':
+          description: Consignment, Parcels, accepted pricing, status, audit, and outbox persisted.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsignmentDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          $ref: '#/components/responses/PricingUnavailable'
+  /consignments/pricing-quotes:
+    post:
+      tags: [Consignments]
+      operationId: calculateConsignmentPricing
+      summary: Calculate a create or edit pricing quote without mutating the aggregate
+      x-chabok-source: UF-001, UF-002, Create/Edit approved designs
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingQuoteRequest'
+      responses:
+        '200':
+          description: Non-mutating multi-option quote bundle for explicit later acceptance.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingQuoteSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          $ref: '#/components/responses/PricingUnavailable'
+  /consignments/{consignment_id}:
+    parameters:
+      - $ref: '#/components/parameters/ConsignmentId'
+    get:
+      tags: [Consignments]
+      operationId: getConsignment
+      summary: Read Consignment Detail Option A data
+      x-chabok-source: SCR-008, UF-011, approved Detail Option A
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Scope-filtered Consignment detail.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsignmentDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Consignments]
+      operationId: editConsignment
+      summary: Edit eligible fields with optimistic concurrency and accepted repricing
+      x-chabok-source: SCR-010, UF-002, approved Edit design
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditConsignmentRequest'
+      responses:
+        '200':
+          description: Updated Consignment with preserved pricing history.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsignmentDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          $ref: '#/components/responses/PricingUnavailable'
+  /admin/consignment-number-ranges:
+    get:
+      tags: [Consignment Number Ranges]
+      operationId: listConsignmentNumberRanges
+      summary: List number ranges owned by the authenticated HQ
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ConsignmentNumberRangeStatus' }
+      responses:
+        '200':
+          description: Tenant-scoped range page.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberRangeListSuccess' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Consignment Number Ranges]
+      operationId: createConsignmentNumberRange
+      summary: Revalidate and immediately activate a range under the global overlap lock
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateConsignmentNumberRangeRequest' } } }
+      responses:
+        '201':
+          description: Range is AVAILABLE immediately.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberRangeSuccess' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /admin/consignment-number-ranges/validate:
+    post:
+      tags: [Consignment Number Ranges]
+      operationId: validateConsignmentNumberRange
+      summary: Validate and preview a range without persistence
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberRangeDefinitionInput' } } }
+      responses:
+        '200':
+          description: Non-persisted normalized preview, including overlap result.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberRangePreviewSuccess' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /admin/consignment-number-ranges/{range_id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: range_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Consignment Number Ranges]
+      operationId: getConsignmentNumberRange
+      summary: Get one number range owned by the authenticated HQ
+      responses:
+        '200':
+          description: Tenant-scoped range detail.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberRangeSuccess' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/consignment-number-ranges/{range_id}/allocations:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: range_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Consignment Number Ranges]
+      operationId: listConsignmentNumberRangeAllocations
+      summary: List immutable allocations for one tenant-owned range
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Server-paginated tenant-scoped immutable allocation history.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberAllocationListSuccess' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/consignment-number-ranges/{range_id}/disable:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: range_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Consignment Number Ranges]
+      operationId: disableConsignmentNumberRange
+      summary: Disable an AVAILABLE immutable range definition
+      responses:
+        '200':
+          description: Range disabled and excluded from allocation.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsignmentNumberRangeSuccess' } } }
+        '401': { $ref: '#/components/responses/AuthenticationRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    CorrelationId:
+      description: Request correlation identifier.
+      schema:
+        type: string
+        format: uuid
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    NodeId:
+      name: X-Node-Id
+      in: header
+      required: true
+      description: |
+        Operational context hint validated against server-resolved tenant and
+        scope. It never establishes or overrides tenant identity.
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    ConsignmentId:
+      name: consignment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 250
+        default: 25
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+        maxLength: 160
+    Status:
+      name: status
+      in: query
+      description: Comma-separated selections (OR); other filters combine with AND. Legacy scalar accepted; empty means unrestricted. Up to 50 selections.
+      style: form
+      explode: false
+      schema:
+        type: array
+        maxItems: 50
+        items:
+            $ref: '#/components/schemas/OperationalStatus'
+    StatusGroup:
+      name: status_group
+      in: query
+      schema:
+        type: string
+        enum: [NEW_ROUTED, UNASSIGNED, ASSIGNED, IN_OPERATION, EXCEPTION, COMPLETED, CANCELLED]
+    PickupNodeId:
+      name: pickup_node_id
+      in: query
+      description: Comma-separated selections (OR); other filters combine with AND. Legacy scalar accepted; empty means unrestricted. Up to 50 selections.
+      style: form
+      explode: false
+      schema:
+        type: array
+        maxItems: 50
+        items:
+            type: string
+            format: uuid
+    DeliveryNodeId:
+      name: delivery_node_id
+      in: query
+      description: Comma-separated selections (OR); other filters combine with AND. Legacy scalar accepted; empty means unrestricted. Up to 50 selections.
+      style: form
+      explode: false
+      schema:
+        type: array
+        maxItems: 50
+        items:
+            type: string
+            format: uuid
+    ServiceTypeId:
+      name: service_type_id
+      in: query
+      schema:
+        type: string
+        format: uuid
+    ShippingMethodId:
+      name: shipping_method_id
+      in: query
+      schema:
+        type: string
+        format: uuid
+    CreatedFrom:
+      name: created_from
+      in: query
+      schema:
+        type: string
+        format: date-time
+    CreatedTo:
+      name: created_to
+      in: query
+      schema:
+        type: string
+        format: date-time
+    Sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        enum: [created_at, -created_at, updated_at, -updated_at, consignment_number, -consignment_number, current_status, -current_status]
+        default: -created_at
+  responses:
+    AuthenticationRequired:
+      description: Authentication is required.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Tenant, entitlement, permission, or operational-scope access denied.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Resource is not visible in the tenant/scope-filtered query.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Aggregate version, identifier, or idempotency conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unprocessable:
+      description: Validation, pricing acceptance, lifecycle, or domain-policy rejection.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PricingUnavailable:
+      description: Production pricing provider is unavailable; no mutation occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    NumericConsignmentNumber:
+      type: string
+      pattern: '^[0-9]{6,28}$'
+      minLength: 6
+      maxLength: 28
+    DecimalCount:
+      type: string
+      pattern: '^[0-9]+$'
+    ConsignmentNumberRangeStatus:
+      type: string
+      enum: [AVAILABLE, EXHAUSTED, DISABLED]
+    ConsignmentNumberRangeDefinitionInput:
+      type: object
+      additionalProperties: false
+      required: [numeric_prefix, total_length, serial_start, serial_end]
+      properties:
+        numeric_prefix: { type: string, pattern: '^[0-9]+$', maxLength: 27 }
+        total_length: { type: integer, minimum: 6, maximum: 28 }
+        serial_start: { type: string, pattern: '^[0-9]+$', maxLength: 28 }
+        serial_end: { type: string, pattern: '^[0-9]+$', maxLength: 28 }
+    CreateConsignmentNumberRangeRequest:
+      type: object
+      additionalProperties: false
+      required: [title, numeric_prefix, total_length, serial_start, serial_end]
+      properties:
+        title: { type: string, maxLength: 200 }
+        numeric_prefix: { type: string, pattern: '^[0-9]+$', maxLength: 27 }
+        total_length: { type: integer, minimum: 6, maximum: 28 }
+        serial_start: { type: string, pattern: '^[0-9]+$', maxLength: 28 }
+        serial_end: { type: string, pattern: '^[0-9]+$', maxLength: 28 }
+    ConsignmentNumberRangePreview:
+      type: object
+      additionalProperties: false
+      required: [numeric_prefix, total_length, serial_width, serial_start, serial_end, first_number, last_number, total_capacity, sample_first_values, sample_final_values, overlaps_existing_range, validation_result]
+      properties:
+        numeric_prefix: { type: string, pattern: '^[0-9]+$' }
+        total_length: { type: integer }
+        serial_width: { type: integer }
+        serial_start: { type: string, pattern: '^[0-9]+$' }
+        serial_end: { type: string, pattern: '^[0-9]+$' }
+        first_number: { $ref: '#/components/schemas/NumericConsignmentNumber' }
+        last_number: { $ref: '#/components/schemas/NumericConsignmentNumber' }
+        total_capacity: { $ref: '#/components/schemas/DecimalCount' }
+        sample_first_values: { type: array, items: { $ref: '#/components/schemas/NumericConsignmentNumber' } }
+        sample_final_values: { type: array, items: { $ref: '#/components/schemas/NumericConsignmentNumber' } }
+        overlaps_existing_range: { type: boolean }
+        validation_result: { type: string, enum: [VALID, OVERLAP] }
+    ConsignmentNumberRange:
+      type: object
+      additionalProperties: false
+      required: [range_id, title, numeric_prefix, total_length, serial_width, serial_start, serial_end, first_number, last_number, next_number, total_capacity, allocated_count, remaining_count, status, created_by, created_at, updated_at, disabled_by, disabled_at, exhausted_at]
+      properties:
+        range_id: { type: string, format: uuid }
+        title: { type: string }
+        numeric_prefix: { type: string, pattern: '^[0-9]+$' }
+        total_length: { type: integer }
+        serial_width: { type: integer }
+        serial_start: { type: string, pattern: '^[0-9]+$' }
+        serial_end: { type: string, pattern: '^[0-9]+$' }
+        first_number: { $ref: '#/components/schemas/NumericConsignmentNumber' }
+        last_number: { $ref: '#/components/schemas/NumericConsignmentNumber' }
+        next_number: { oneOf: [{ $ref: '#/components/schemas/NumericConsignmentNumber' }, { type: 'null' }] }
+        total_capacity: { $ref: '#/components/schemas/DecimalCount' }
+        allocated_count: { $ref: '#/components/schemas/DecimalCount' }
+        remaining_count: { $ref: '#/components/schemas/DecimalCount' }
+        status: { $ref: '#/components/schemas/ConsignmentNumberRangeStatus' }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        disabled_by: { type: [string, 'null'], format: uuid }
+        disabled_at: { type: [string, 'null'], format: date-time }
+        exhausted_at: { type: [string, 'null'], format: date-time }
+    ConsignmentNumberAllocation:
+      type: object
+      additionalProperties: false
+      required: [allocation_id, range_id, consignment_id, consignment_number, allocated_by, allocated_at, correlation_id]
+      properties:
+        allocation_id: { type: string, format: uuid }
+        range_id: { type: string, format: uuid }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { $ref: '#/components/schemas/NumericConsignmentNumber' }
+        allocated_by: { type: string, format: uuid }
+        allocated_at: { type: string, format: date-time }
+        correlation_id: { type: string, format: uuid }
+    ConsignmentNumberRangeSuccess:
+      type: object
+      required: [data, meta, correlation_id]
+      properties: { data: { $ref: '#/components/schemas/ConsignmentNumberRange' }, meta: { type: object }, correlation_id: { type: string, format: uuid } }
+    ConsignmentNumberRangePreviewSuccess:
+      type: object
+      required: [data, meta, correlation_id]
+      properties: { data: { $ref: '#/components/schemas/ConsignmentNumberRangePreview' }, meta: { type: object }, correlation_id: { type: string, format: uuid } }
+    ConsignmentNumberRangeListSuccess:
+      type: object
+      required: [data, meta, correlation_id]
+      properties: { data: { type: array, items: { $ref: '#/components/schemas/ConsignmentNumberRange' } }, meta: { type: object }, correlation_id: { type: string, format: uuid } }
+    ConsignmentNumberAllocationListSuccess:
+      type: object
+      required: [data, meta, correlation_id]
+      properties: { data: { type: array, items: { $ref: '#/components/schemas/ConsignmentNumberAllocation' } }, meta: { type: object }, correlation_id: { type: string, format: uuid } }
+    OperationalStatusFields:
+      type: object
+      required: [title_fa, tone, is_active, is_terminal, sort_order]
+      properties:
+        title_fa: { type: string, minLength: 1, maxLength: 200 }
+        title_en: { type: [string, 'null'], maxLength: 200 }
+        partial_title_fa: { type: [string, 'null'], maxLength: 200 }
+        partial_title_en: { type: [string, 'null'], maxLength: 200 }
+        tone: { type: string, enum: [neutral, info, brand, warning, danger, success, ink] }
+        is_active: { type: boolean }
+        is_terminal: { type: boolean }
+        status_group: { type: [string, 'null'], enum: [NEW_ROUTED, IN_OPERATION, EXCEPTION, COMPLETED, CANCELLED, null] }
+        sort_order: { type: integer, minimum: 0, maximum: 10000 }
+    OperationalStatusEntry:
+      allOf:
+        - $ref: '#/components/schemas/OperationalStatusFields'
+        - type: object
+          required: [status_id, hq_id, code, is_system, manifest_enabled, can_manage, version]
+          properties:
+            status_id: { type: string, format: uuid }
+            hq_id: { type: [string, 'null'], format: uuid }
+            code: { $ref: '#/components/schemas/OperationalStatus' }
+            is_system: { type: boolean }
+            manifest_enabled: { type: boolean }
+            can_manage: { type: boolean }
+            version: { type: integer, minimum: 1 }
+    OperationalStatusSuccess:
+      type: object
+      required: [data, correlation_id]
+      properties:
+        data: { $ref: '#/components/schemas/OperationalStatusEntry' }
+        correlation_id: { type: string, format: uuid }
+    OperationalStatus:
+      type: string
+      pattern: '^[A-Z][A-Z0-9_]{1,31}$'
+      description: Code from the global and tenant operational status catalogue.
+    ConsignmentAggregate:
+      type: object
+      additionalProperties: false
+      required: [status, mode, parcel_counts, parcel_total, target_count]
+      properties:
+        status:
+          $ref: '#/components/schemas/OperationalStatus'
+        mode:
+          type: string
+          enum: [FULL, PARTIAL]
+        parcel_counts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        parcel_total:
+          type: integer
+          minimum: 1
+        target_count:
+          type: integer
+          minimum: 0
+    ContactAddressInput:
+      type: object
+      additionalProperties: false
+      required: [contact_name, mobile, address_text, state, city, city_id]
+      properties:
+        address_book_entry_id:
+          type: [string, 'null']
+          format: uuid
+        contact_name:
+          type: string
+          maxLength: 200
+        mobile:
+          type: string
+          maxLength: 32
+        phone:
+          type: [string, 'null']
+          maxLength: 32
+        address_text:
+          type: string
+          maxLength: 1000
+        country:
+          type: [string, 'null']
+          maxLength: 120
+        state:
+          type: string
+          maxLength: 160
+        city:
+          type: string
+          maxLength: 160
+          description: Historical display snapshot derived by the server from city_id for new writes.
+        city_id:
+          type: [string, 'null']
+          format: uuid
+          description: Canonical Geography city. Required and non-null for new Consignments; nullable only on legacy reads and transitional edits.
+        city_reference:
+          oneOf:
+            - $ref: './geography.yaml#/components/schemas/City'
+            - type: 'null'
+        postal_code:
+          type: [string, 'null']
+          maxLength: 32
+        latitude:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+    ParcelInput:
+      type: object
+      additionalProperties: false
+      properties:
+        content_description:
+          type: [string, 'null']
+          maxLength: 500
+        weight_kg:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        width_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        length_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        height_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+    ConsignmentDraftInput:
+      type: object
+      additionalProperties: false
+      required:
+        - sender
+        - receiver
+        - weight_kg
+        - declared_value_amount
+        - insurance_enabled
+        - cod_enabled
+        - payer
+        - payment_method
+        - parcels
+      properties:
+        sender:
+          $ref: '#/components/schemas/ContactAddressInput'
+        receiver:
+          $ref: '#/components/schemas/ContactAddressInput'
+        delivery_node_id:
+          type: [string, 'null']
+          format: uuid
+          description: Final operational delivery node; tenant validated by the server.
+        service_type_id:
+          type: [string, 'null']
+          format: uuid
+        shipping_method_id:
+          type: [string, 'null']
+          format: uuid
+        service_offering_id:
+          type: [string, 'null']
+          format: uuid
+          description: Stable published Service Offering identity; required when internal Catalog cutover is enabled.
+        service_offering_version_id:
+          type: [string, 'null']
+          format: uuid
+          description: Exact immutable Service Offering Version selected for pricing and issuance.
+        selected_option_version_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        pickup_service_date:
+          type: [string, 'null']
+          format: date
+        pickup_window_code:
+          type: [string, 'null']
+          maxLength: 80
+        delivery_window_code:
+          type: [string, 'null']
+          maxLength: 80
+        pickup_commitment_at:
+          type: [string, 'null']
+          format: date-time
+        delivery_commitment_at:
+          type: [string, 'null']
+          format: date-time
+        weight_kg:
+          type: number
+          exclusiveMinimum: 0
+        width_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        length_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        height_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        declared_value_amount:
+          type: integer
+          minimum: 0
+          description: Integer Iranian rials (IRR), zero decimal places.
+        insurance_enabled:
+          type: boolean
+          description: Mandatory for new pilot quote/create requests.
+        insurance_value_amount:
+          type: [integer, 'null']
+          minimum: 0
+        cod_enabled:
+          type: boolean
+        cod_amount:
+          type: [integer, 'null']
+          minimum: 0
+        payer:
+          type: string
+          enum: [SENDER, RECEIVER, VENDOR]
+          description: New pilot quote/create accepts only SENDER or RECEIVER; VENDOR remains response-compatible for history.
+        payment_method:
+          type: string
+          enum: [CASH, CREDIT, COD]
+          description: New pilot quote/create accepts only CASH or CREDIT; COD remains a separate capability and historical response value.
+        parcels:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ParcelInput'
+    AcceptedQuoteInput:
+      type: object
+      additionalProperties: false
+      required: [quote_id, quote_version, option_id]
+      properties:
+        quote_id:
+          type: string
+          format: uuid
+        quote_version:
+          type: integer
+          minimum: 1
+        option_id:
+          type: string
+          format: uuid
+    CreateConsignmentRequest:
+      allOf:
+        - $ref: '#/components/schemas/ConsignmentDraftInput'
+        - type: object
+          additionalProperties: false
+          required: [accepted_quote]
+          properties:
+            accepted_quote:
+              $ref: '#/components/schemas/AcceptedQuoteInput'
+    PricingQuoteRequest:
+      allOf:
+        - $ref: '#/components/schemas/ConsignmentDraftInput'
+        - type: object
+          additionalProperties: false
+          required: [purpose]
+          properties:
+            purpose:
+              type: string
+              enum: [CREATE, EDIT]
+            consignment_id:
+              type: [string, 'null']
+              format: uuid
+            expected_version:
+              type: [integer, 'null']
+              minimum: 1
+    EditConsignmentRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 4
+      required: [expected_version, change_reason]
+      properties:
+        payer:
+          type: string
+          enum: [SENDER, RECEIVER, VENDOR]
+        payment_method:
+          type: string
+          enum: [CASH, CREDIT, COD]
+        parcels:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: Full existing parcel list, identified by stable IDs. Updates measurements and contents without changing IDs, count or operational status.
+          items:
+            type: object
+            additionalProperties: false
+            required: [parcel_id, content_description, weight_kg, width_cm, length_cm, height_cm]
+            properties:
+              parcel_id: { type: string, format: uuid }
+              content_description: { type: [string, "null"], maxLength: 500 }
+              weight_kg: { type: [number, "null"], exclusiveMinimum: 0 }
+              width_cm: { type: [number, "null"], exclusiveMinimum: 0 }
+              length_cm: { type: [number, "null"], exclusiveMinimum: 0 }
+              height_cm: { type: [number, "null"], exclusiveMinimum: 0 }
+        expected_version:
+          type: integer
+          minimum: 1
+        change_reason:
+          type: string
+          minLength: 1
+          maxLength: 160
+        note:
+          type: [string, 'null']
+          maxLength: 1000
+        sender:
+          $ref: '#/components/schemas/ContactAddressInput'
+        receiver:
+          $ref: '#/components/schemas/ContactAddressInput'
+        service_type_id:
+          type: string
+          format: uuid
+        shipping_method_id:
+          type: string
+          format: uuid
+        service_offering_id:
+          type: [string, 'null']
+          format: uuid
+        service_offering_version_id:
+          type: [string, 'null']
+          format: uuid
+        selected_option_version_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        pickup_service_date:
+          type: [string, 'null']
+          format: date
+        pickup_window_code:
+          type: [string, 'null']
+          maxLength: 80
+        delivery_window_code:
+          type: [string, 'null']
+          maxLength: 80
+        pickup_commitment_at:
+          type: [string, 'null']
+          format: date-time
+        delivery_commitment_at:
+          type: [string, 'null']
+          format: date-time
+        weight_kg:
+          type: number
+          exclusiveMinimum: 0
+        width_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        length_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        height_cm:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+        declared_value_amount:
+          type: integer
+          minimum: 0
+        insurance_enabled:
+          type: boolean
+        insurance_value_amount:
+          type: [integer, 'null']
+          minimum: 0
+        cod_enabled:
+          type: boolean
+        cod_amount:
+          type: [integer, 'null']
+          minimum: 0
+        accepted_quote:
+          $ref: '#/components/schemas/AcceptedQuoteInput'
+    PricingChargeLine:
+      type: object
+      additionalProperties: false
+      required: [charge_code, title, amount]
+      properties:
+        charge_code:
+          type: string
+          maxLength: 80
+        title:
+          type: string
+          maxLength: 200
+        amount:
+          type: integer
+        category:
+          type: [string, 'null']
+        calculation_method:
+          type: [string, 'null']
+        basis:
+          type: [string, 'null']
+        quantity:
+          type: [number, 'null']
+        unit_rate:
+          type: [number, 'null']
+        explanation:
+          type: [object, 'null']
+          additionalProperties: true
+    DeliveryWindow:
+      type: object
+      additionalProperties: false
+      required: [gregorian_date, time_ranges]
+      properties:
+        gregorian_date:
+          type: string
+          format: date
+        jalali_display_date:
+          type: [string, 'null']
+        persian_weekday_label:
+          type: [string, 'null']
+        persian_month_label:
+          type: [string, 'null']
+        time_ranges:
+          type: array
+          items:
+            type: string
+    PricingOption:
+      type: object
+      additionalProperties: false
+      required:
+        - option_id
+        - external_method_code
+        - method_name
+        - icon
+        - external_price_list_code
+        - zone
+        - available
+        - unavailable_reason
+        - currency
+        - total_amount
+        - charge_lines
+        - min_ins
+        - delivery_windows
+      properties:
+        billable_weight_kg:
+          type: [number, "null"]
+          minimum: 0
+          description: Tariff-derived total chargeable weight, including per-parcel volumetric weight and rounding. Absent when the provider does not supply it.
+        option_id:
+          type: string
+          format: uuid
+        provider_code:
+          type: string
+          enum: [LEGACY_CORE, INTERNAL]
+        internal_quote_id:
+          type: [string, 'null']
+          format: uuid
+        external_method_code:
+          type: string
+        method_name:
+          type: string
+        icon:
+          type: [string, 'null']
+        external_price_list_code:
+          type: [string, 'null']
+        zone:
+          type: [string, 'null']
+        available:
+          type: boolean
+        unavailable_reason:
+          type: [string, 'null']
+        currency:
+          type: string
+          const: IRR
+        total_amount:
+          type: [integer, 'null']
+          minimum: 1
+        charge_lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingChargeLine'
+        min_ins:
+          type: [integer, 'null']
+          minimum: 0
+        delivery_windows:
+          type: array
+          description: Informational service estimates; not appointment selections.
+          items:
+            $ref: '#/components/schemas/DeliveryWindow'
+        service_offering_id:
+          type: [string, 'null']
+          format: uuid
+        service_offering_version_id:
+          type: [string, 'null']
+          format: uuid
+        selected_option_version_ids:
+          type: array
+          items: { type: string, format: uuid }
+        commitment:
+          type: [object, 'null']
+          additionalProperties: true
+        result_fingerprint:
+          type: [string, 'null']
+        warnings:
+          type: array
+          items:
+            type: string
+    PricingQuote:
+      type: object
+      additionalProperties: false
+      required: [quote_id, quote_version, purpose, expires_at, options]
+      properties:
+        quote_id:
+          type: string
+          format: uuid
+        quote_version:
+          type: integer
+          const: 1
+        purpose:
+          type: string
+          enum: [CREATE, EDIT]
+        expires_at:
+          type: string
+          format: date-time
+        options:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PricingOption'
+    Parcel:
+      type: object
+      additionalProperties: false
+      required: [parcel_id, parcel_number, current_status, current_node_id, current_custody_type, current_custodian_id, active_route_plan_id, active_route_plan_leg_id, version, created_at]
+      properties:
+        parcel_id:
+          type: string
+          format: uuid
+        parcel_number:
+          type: string
+        current_status:
+          $ref: '#/components/schemas/OperationalStatus'
+        current_node_id: { type: [string, 'null'], format: uuid }
+        current_custody_type: { type: string, enum: [NODE, PICKUP_DRIVER, LINEHAUL_DRIVER, DELIVERY_DRIVER, RECIPIENT] }
+        current_custodian_id: { type: [string, 'null'], format: uuid }
+        active_route_plan_id: { type: [string, 'null'], format: uuid }
+        active_route_plan_leg_id: { type: [string, 'null'], format: uuid }
+        version: { type: integer, minimum: 1 }
+        content_description:
+          type: [string, 'null']
+          maxLength: 500
+        weight_kg:
+          type: [number, 'null']
+        width_cm:
+          type: [number, 'null']
+        length_cm:
+          type: [number, 'null']
+        height_cm:
+          type: [number, 'null']
+        created_at:
+          type: string
+          format: date-time
+    StatusTimelineItem:
+      type: object
+      additionalProperties: false
+      required: [status_event_id, previous_status, new_status, initiator_id, created_at]
+      properties:
+        status_event_id:
+          type: string
+          format: uuid
+        event_sequence: { type: [integer, 'null'], minimum: 1 }
+        parcel_id:
+          type: [string, 'null']
+          format: uuid
+        previous_status:
+          anyOf:
+            - $ref: '#/components/schemas/OperationalStatus'
+            - type: 'null'
+        new_status:
+          $ref: '#/components/schemas/OperationalStatus'
+        aggregate_mode:
+          type: [string, 'null']
+          enum: [FULL, PARTIAL, null]
+        parcel_status_counts:
+          type: [object, 'null']
+          additionalProperties:
+            type: integer
+            minimum: 0
+        initiator_id:
+          type: string
+          format: uuid
+        node_id:
+          type: [string, 'null']
+          format: uuid
+        manifest_id:
+          type: [string, 'null']
+          format: uuid
+        correlation_id:
+          type: [string, 'null']
+          format: uuid
+        reason_code:
+          type: [string, 'null']
+        note:
+          type: [string, 'null']
+        created_at:
+          type: string
+          format: date-time
+    AuditTimelineItem:
+      type: object
+      additionalProperties: false
+      required: [audit_id, action_key, initiator_id, created_at]
+      properties:
+        audit_id:
+          type: string
+          format: uuid
+        action_key:
+          type: string
+        initiator_id:
+          type: string
+          format: uuid
+        safe_note:
+          type: [string, 'null']
+        created_at:
+          type: string
+          format: date-time
+    AcceptedPricingVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - pricing_version_id
+        - version_number
+        - provider_code
+        - quote_id
+        - quote_version
+        - option_id
+        - external_method_code
+        - method_name
+        - currency
+        - total_amount
+        - accepted_at
+        - charge_lines
+      properties:
+        pricing_version_id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+          minimum: 1
+        provider_code:
+          type: string
+          const: LEGACY_CORE
+        quote_id:
+          type: string
+          format: uuid
+        quote_version:
+          type: integer
+          minimum: 1
+        option_id:
+          type: string
+          format: uuid
+        external_method_code:
+          type: string
+        method_name:
+          type: string
+        external_price_list_code:
+          type: [string, 'null']
+        zone:
+          type: [string, 'null']
+        currency:
+          type: string
+          const: IRR
+        total_amount:
+          type: integer
+          minimum: 1
+        min_ins:
+          type: [integer, 'null']
+          minimum: 0
+        delivery_windows:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryWindow'
+        accepted_at:
+          type: string
+          format: date-time
+        charge_lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingChargeLine'
+    ConsignmentListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - consignment_id
+        - consignment_number
+        - receiver_contact_name
+        - receiver_mobile
+        - receiver_address_text
+        - pickup_node_id
+        - pickup_node_title
+        - delivery_node_id
+        - delivery_node_title
+        - pickup_man_id
+        - delivery_man_id
+        - current_status
+        - aggregate
+        - parcel_count
+        - payable_total_amount
+        - payable_currency
+        - version
+        - created_at
+        - updated_at
+      properties:
+        consignment_id:
+          type: string
+          format: uuid
+        consignment_number:
+          type: string
+        receiver_contact_name:
+          type: string
+        receiver_mobile:
+          type: string
+        receiver_address_text:
+          type: string
+        pickup_node_id:
+          type: [string, 'null']
+          format: uuid
+        pickup_node_title:
+          type: string
+        delivery_node_id:
+          type: [string, 'null']
+          format: uuid
+        delivery_node_title:
+          type: [string, 'null']
+        pickup_man_id:
+          type: [string, 'null']
+          format: uuid
+        delivery_man_id:
+          type: [string, 'null']
+          format: uuid
+        pickup_man_title:
+          type: [string, 'null']
+          description: Tenant-qualified assigned pickup driver display name.
+        delivery_man_title:
+          type: [string, 'null']
+          description: Tenant-qualified assigned delivery driver display name.
+        current_status:
+          $ref: '#/components/schemas/OperationalStatus'
+        aggregate:
+          $ref: '#/components/schemas/ConsignmentAggregate'
+        parcel_count:
+          type: integer
+          minimum: 1
+        payable_total_amount:
+          type: [integer, 'null']
+          minimum: 0
+          description: Latest authoritative accepted pricing total; clients must not derive it from charge lines.
+        payable_currency:
+          type: [string, 'null']
+        version:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ConsignmentDetail:
+      allOf:
+        - $ref: '#/components/schemas/ConsignmentListItem'
+        - type: object
+          additionalProperties: false
+          required:
+            - sender
+            - receiver
+            - service_type_id
+            - shipping_method_id
+            - pickup_commitment_at
+            - delivery_commitment_at
+            - weight_kg
+            - declared_value_amount
+            - insurance_enabled
+            - insurance_value_amount
+            - cod_enabled
+            - cod_amount
+            - payer
+            - payment_method
+            - parcels
+            - accepted_pricing_versions
+            - status_timeline
+            - audit_timeline
+            - related_manifests
+            - current_location
+            - journey
+            - permitted_actions
+          properties:
+            non_pricing_contact_fields:
+              type: array
+              description: Server-assessed contact fields that can be edited without replacing accepted pricing. Rechecked at save.
+              items: { type: string }
+            sender:
+              $ref: '#/components/schemas/ContactAddressInput'
+            receiver:
+              $ref: '#/components/schemas/ContactAddressInput'
+            service_type_id:
+              type: string
+              format: uuid
+            shipping_method_id:
+              type: string
+              format: uuid
+            service_offering_id:
+              type: [string, 'null']
+              format: uuid
+            service_offering_version_id:
+              type: [string, 'null']
+              format: uuid
+            delivery_commitment_resolution: { type: [object, 'null'], additionalProperties: true, description: 'Operational anchor resolution from the immutable issuance commitment policy.' }
+            catalog_snapshot:
+              type: [object, 'null']
+              additionalProperties: true
+              description: Effective catalog names, selected services and commitment evidence captured at issuance. Later catalog edits do not change this snapshot.
+            service_offering_title:
+              type: [string, 'null']
+              description: Historical title resolved from the immutable selected Offering version.
+            service_type_title:
+              type: [string, 'null']
+              description: Historical title resolved from the immutable selected Service Type version.
+            shipping_method_title:
+              type: [string, 'null']
+              description: Historical title resolved from the immutable selected Shipping Method version.
+            selected_service_option_versions:
+              type: array
+              items:
+                type: string
+                format: uuid
+            commitment_schedule_version_id:
+              type: [string, 'null']
+              format: uuid
+            pickup_service_date:
+              type: [string, 'null']
+              format: date
+            pickup_window_code:
+              type: [string, 'null']
+            delivery_window_code:
+              type: [string, 'null']
+            commitment_snapshot:
+              type: [object, 'null']
+              additionalProperties: true
+            commercial_pricing_state:
+              type: string
+              enum: [UNPRICED, QUOTED, LOCKED, STALE, ADJUSTED, VOID]
+            active_pricing_snapshot_id:
+              type: [string, 'null']
+              format: uuid
+            pickup_commitment_at:
+              type: [string, 'null']
+              format: date-time
+            pickup_commitment_start_at:
+              type: [string, 'null']
+              format: date-time
+            pickup_commitment_end_at:
+              type: [string, 'null']
+              format: date-time
+            delivery_commitment_at:
+              type: [string, 'null']
+              format: date-time
+            delivery_commitment_start_at:
+              type: [string, 'null']
+              format: date-time
+            delivery_commitment_end_at:
+              type: [string, 'null']
+              format: date-time
+            weight_kg:
+              type: number
+            width_cm:
+              type: [number, 'null']
+            length_cm:
+              type: [number, 'null']
+            height_cm:
+              type: [number, 'null']
+            declared_value_amount:
+              type: integer
+            insurance_enabled:
+              type: boolean
+            insurance_value_amount:
+              type: [integer, 'null']
+            cod_enabled:
+              type: boolean
+            cod_amount:
+              type: [integer, 'null']
+            payer:
+              type: string
+              enum: [SENDER, RECEIVER, VENDOR]
+            payment_method:
+              type: string
+              enum: [CASH, CREDIT, COD]
+            parcels:
+              type: array
+              items:
+                $ref: '#/components/schemas/Parcel'
+            accepted_pricing_versions:
+              type: array
+              items:
+                $ref: '#/components/schemas/AcceptedPricingVersion'
+            status_timeline:
+              type: array
+              items:
+                $ref: '#/components/schemas/StatusTimelineItem'
+            audit_timeline:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditTimelineItem'
+            related_manifests:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+                required: [manifest_id, manifest_number]
+                properties:
+                  manifest_id:
+                    type: string
+                    format: uuid
+                  manifest_number:
+                    type: string
+            current_location:
+              type: object
+              additionalProperties: false
+              required: [state, node, custody_type, custodian_id]
+              properties:
+                state: { type: string, enum: [AT_NODE, IN_CUSTODY, MIXED] }
+                node:
+                  oneOf:
+                    - $ref: '#/components/schemas/JourneyNode'
+                    - type: 'null'
+                custody_type: { type: string, enum: [NODE, PICKUP_DRIVER, LINEHAUL_DRIVER, DELIVERY_DRIVER, RECIPIENT, MIXED] }
+                custodian_id: { type: [string, 'null'], format: uuid }
+            journey:
+              $ref: '#/components/schemas/ConsignmentJourney'
+            permitted_actions:
+              type: array
+              items:
+                type: string
+                enum: [EDIT]
+    JourneyNode:
+      type: object
+      additionalProperties: false
+      required: [node_id, node_code, node_title]
+      properties:
+        node_id: { type: string, format: uuid }
+        node_code: { type: string }
+        node_title: { type: string }
+    ConsignmentJourney:
+      type: object
+      additionalProperties: false
+      required: [route_plan, route_legs, movement_manifests, custody_timeline]
+      properties:
+        route_plan:
+          type: [object, 'null']
+          additionalProperties: true
+        route_legs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [route_plan_leg_id, leg_order, status, origin_node, destination_node]
+            properties:
+              route_plan_leg_id: { type: string, format: uuid }
+              leg_order: { type: integer, minimum: 1 }
+              status: { type: string }
+              origin_node: { $ref: '#/components/schemas/JourneyNode' }
+              destination_node: { $ref: '#/components/schemas/JourneyNode' }
+              routed_at: { type: [string, 'null'], format: date-time }
+              received_at: { type: [string, 'null'], format: date-time }
+        movement_manifests:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [manifest_id, manifest_number, manifest_status, manifest_type, operational_context_type, route_plan_id, route_plan_leg_id, assigned_driver_id, assigned_vehicle_id, state, event_type, recorded_at]
+            properties:
+              manifest_id: { type: string, format: uuid }
+              manifest_number: { type: string }
+              manifest_status: { type: string, enum: [OS, IR] }
+              manifest_type: { type: string }
+              operational_context_type: { type: string, enum: [LINEHAUL_DEPARTURE, MOVEMENT_RECEPTION] }
+              route_plan_id: { type: string, format: uuid }
+              route_plan_leg_id: { type: string, format: uuid }
+              assigned_driver_id: { type: string, format: uuid }
+              assigned_vehicle_id: { type: string, format: uuid }
+              state: { type: string, const: CLOSED }
+              event_type: { type: string, enum: [DEPARTED, RECEIVED] }
+              recorded_at: { type: string, format: date-time }
+        custody_timeline:
+          type: array
+          items: { type: object, additionalProperties: true }
+    ConsignmentStatusCounts:
+      type: object
+      additionalProperties: false
+      required:
+        - total
+        - new_routed
+        - unassigned
+        - assigned
+        - in_operation
+        - exception
+        - completed
+        - cancelled
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        new_routed:
+          type: integer
+          minimum: 0
+        unassigned:
+          type: integer
+          minimum: 0
+        assigned:
+          type: integer
+          minimum: 0
+        in_operation:
+          type: integer
+          minimum: 0
+        exception:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+        cancelled:
+          type: integer
+          minimum: 0
+    ConsignmentListMeta:
+      type: object
+      additionalProperties: false
+      required: [pagination, status_counts]
+      properties:
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, page_size, total, total_pages]
+          properties:
+            page:
+              type: integer
+            page_size:
+              type: integer
+            total:
+              type: integer
+            total_pages:
+              type: integer
+        filter_options:
+          type: object
+          description: Assigned agents on consignments visible in the current tenant and node, including historical inactive agents.
+          properties:
+            pickup_agents:
+              type: array
+              items:
+                type: object
+                required: [value, label]
+                properties:
+                  value: { type: string, format: uuid }
+                  label: { type: string }
+            delivery_agents:
+              type: array
+              items:
+                type: object
+                required: [value, label]
+                properties:
+                  value: { type: string, format: uuid }
+                  label: { type: string }
+        status_counts:
+          $ref: '#/components/schemas/ConsignmentStatusCounts'
+    ConsignmentListSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsignmentListItem'
+        meta:
+          $ref: '#/components/schemas/ConsignmentListMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    ConsignmentDetailSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          $ref: '#/components/schemas/ConsignmentDetail'
+        meta:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    PricingQuoteSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          $ref: '#/components/schemas/PricingQuote'
+        meta:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, field_errors, details, correlation_id]
+      properties:
+        error_code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - AUTHENTICATION_REQUIRED
+            - TENANT_ACCESS_DENIED
+            - ENTITLEMENT_DISABLED
+            - PERMISSION_DENIED
+            - SCOPE_ACCESS_DENIED
+            - RESOURCE_NOT_FOUND
+            - VERSION_CONFLICT
+            - IDEMPOTENCY_KEY_REUSED
+            - CONSIGNMENT_NOT_EDITABLE
+            - CONSIGNMENT_NUMBER_INVALID_FORMAT
+            - CONSIGNMENT_NUMBER_INVALID_LENGTH
+            - CONSIGNMENT_NUMBER_PREFIX_LENGTH_INCOMPATIBLE
+            - CONSIGNMENT_NUMBER_INVALID_BOUNDARIES
+            - CONSIGNMENT_NUMBER_RANGE_OVERLAP
+            - CONSIGNMENT_NUMBER_RANGE_UNAVAILABLE
+            - CONSIGNMENT_NUMBER_RANGE_EXHAUSTED
+            - PRICING_UNAVAILABLE
+            - PRICING_REJECTED
+            - PRICING_QUOTE_EXPIRED
+            - PRICING_QUOTE_MISMATCH
+        message:
+          type: string
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        details:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid

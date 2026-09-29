@@ -1,0 +1,493 @@
+openapi: 3.1.0
+info:
+  title: Chabok Network Administration API
+  version: 1.0.0
+  description: >-
+    Current-HQ Area, Node, geographic Coverage Policy, and ordered Route
+    Definition administration. This is the Wave 1 public contract baseline;
+    operations are not implemented by the foundation commit.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Network Areas
+  - name: Network Nodes
+  - name: Coverage Policies
+  - name: Route Definitions
+paths:
+  /network/areas:
+    get:
+      tags: [Network Areas]
+      operationId: listNetworkAreas
+      summary: List current-HQ Areas
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.area.view
+      parameters: [{ $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/Status' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/AreaList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Network Areas]
+      operationId: createNetworkArea
+      summary: Create an Area
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.area.manage
+      parameters: [{ $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateAreaRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/AreaDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/areas/{area_id}:
+    get:
+      tags: [Network Areas]
+      operationId: getNetworkArea
+      summary: Get an Area
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.area.view
+      parameters: [{ $ref: '#/components/parameters/AreaId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/AreaDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Network Areas]
+      operationId: updateNetworkArea
+      summary: Update an Area with optimistic concurrency
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.area.manage
+      parameters: [{ $ref: '#/components/parameters/AreaId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateAreaRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/AreaDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/nodes:
+    get:
+      tags: [Network Nodes]
+      operationId: listNetworkNodes
+      summary: List current-HQ Nodes
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.node.view
+      parameters: [{ $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/Status' }, { name: area_id, in: query, schema: { type: string, format: uuid } }, { name: node_type, in: query, schema: { $ref: '#/components/schemas/NodeType' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/NodeList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Network Nodes]
+      operationId: createNetworkNode
+      summary: Create a Node
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.node.manage
+      parameters: [{ $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateNodeRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/NodeDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/nodes/{node_id}:
+    get:
+      tags: [Network Nodes]
+      operationId: getNetworkNode
+      summary: Get a Node
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.node.view
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/NodeDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Network Nodes]
+      operationId: updateNetworkNode
+      summary: Update a Node with optimistic concurrency
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.node.manage
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateNodeRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/NodeDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies:
+    get:
+      tags: [Coverage Policies]
+      operationId: listCoveragePolicies
+      summary: List Coverage Policy identities
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.view
+      parameters: [{ $ref: '#/components/parameters/Search' }, { name: target, in: query, schema: { $ref: '#/components/schemas/CoverageTarget' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/CoveragePolicyList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Coverage Policies]
+      operationId: createCoveragePolicy
+      summary: Create a Coverage Policy identity
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.manage_draft
+      parameters: [{ $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateCoveragePolicyRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/CoveragePolicyDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}:
+    get:
+      tags: [Coverage Policies]
+      operationId: getCoveragePolicy
+      summary: Get a Coverage Policy identity
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.view
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/CoveragePolicyDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /network/coverage-policies/{policy_id}/versions:
+    get:
+      tags: [Coverage Policies]
+      operationId: listCoveragePolicyVersions
+      summary: List the complete version history of a Coverage Policy
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.view
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Coverage Policies]
+      operationId: createCoveragePolicyVersion
+      summary: Create or clone a draft Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.manage_draft
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateCoverageVersionRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}/versions/{version_id}:
+    get:
+      tags: [Coverage Policies]
+      operationId: getCoveragePolicyVersion
+      summary: Get a Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.view
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Coverage Policies]
+      operationId: updateCoveragePolicyVersion
+      summary: Replace editable Coverage Policy Version content
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.manage_draft
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateCoverageVersionRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}/versions/{version_id}/validate:
+    post:
+      tags: [Coverage Policies]
+      operationId: validateCoveragePolicyVersion
+      summary: Validate a draft Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.validate
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}/versions/{version_id}/approve:
+    post:
+      tags: [Coverage Policies]
+      operationId: approveCoveragePolicyVersion
+      summary: Approve a validated Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.approve
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}/versions/{version_id}/publish:
+    post:
+      tags: [Coverage Policies]
+      operationId: publishCoveragePolicyVersion
+      summary: Publish an approved Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.publish
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}/versions/{version_id}/supersede:
+    post:
+      tags: [Coverage Policies]
+      operationId: supersedeCoveragePolicyVersion
+      summary: Supersede a published Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.publish
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/coverage-policies/{policy_id}/versions/{version_id}/archive:
+    post:
+      tags: [Coverage Policies]
+      operationId: archiveCoveragePolicyVersion
+      summary: Archive an unused Coverage Policy Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.coverage.manage_draft
+      parameters: [{ $ref: '#/components/parameters/PolicyId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/CoverageVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions:
+    get:
+      tags: [Route Definitions]
+      operationId: listNetworkRouteDefinitions
+      summary: List Route Definition identities
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.view
+      parameters: [{ $ref: '#/components/parameters/Search' }, { name: purpose, in: query, schema: { $ref: '#/components/schemas/RoutePurpose' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/RouteDefinitionList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Route Definitions]
+      operationId: createNetworkRouteDefinition
+      summary: Create a Route Definition identity
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.manage_draft
+      parameters: [{ $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateRouteDefinitionRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/RouteDefinitionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}:
+    get:
+      tags: [Route Definitions]
+      operationId: getNetworkRouteDefinition
+      summary: Get a Route Definition identity
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.view
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/RouteDefinitionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /network/route-definitions/{route_definition_id}/versions:
+    get:
+      tags: [Route Definitions]
+      operationId: listNetworkRouteDefinitionVersions
+      summary: List the complete version history of a Route Definition
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.view
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/RouteVersionList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Route Definitions]
+      operationId: createNetworkRouteDefinitionVersion
+      summary: Create or clone a draft Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.manage_draft
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateRouteVersionRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}/versions/{version_id}:
+    get:
+      tags: [Route Definitions]
+      operationId: getNetworkRouteDefinitionVersion
+      summary: Get a Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.view
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Route Definitions]
+      operationId: updateNetworkRouteDefinitionVersion
+      summary: Replace editable Route Definition Version content
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.manage_draft
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateRouteVersionRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}/versions/{version_id}/validate:
+    post:
+      tags: [Route Definitions]
+      operationId: validateNetworkRouteDefinitionVersion
+      summary: Validate a draft Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.validate
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}/versions/{version_id}/approve:
+    post:
+      tags: [Route Definitions]
+      operationId: approveNetworkRouteDefinitionVersion
+      summary: Approve a validated Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.approve
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}/versions/{version_id}/publish:
+    post:
+      tags: [Route Definitions]
+      operationId: publishNetworkRouteDefinitionVersion
+      summary: Publish an approved Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.publish
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}/versions/{version_id}/supersede:
+    post:
+      tags: [Route Definitions]
+      operationId: supersedeNetworkRouteDefinitionVersion
+      summary: Supersede a published Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.publish
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /network/route-definitions/{route_definition_id}/versions/{version_id}/archive:
+    post:
+      tags: [Route Definitions]
+      operationId: archiveNetworkRouteDefinitionVersion
+      summary: Archive an unused Route Definition Version
+      x-chabok-entitlement: LiveOperations
+      x-chabok-permission: network.route.manage_draft
+      parameters: [{ $ref: '#/components/parameters/RouteDefinitionId' }, { $ref: '#/components/parameters/VersionId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LifecycleCommand' }
+      responses: { '200': { $ref: '#/components/responses/RouteVersionDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    CorrelationId: { name: X-Correlation-ID, in: header, required: false, schema: { type: string, format: uuid } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 255 } }
+    Search: { name: search, in: query, schema: { type: string, maxLength: 200 } }
+    Status: { name: status, in: query, schema: { $ref: '#/components/schemas/ResourceStatus' } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PerPage: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    AreaId: { name: area_id, in: path, required: true, schema: { type: string, format: uuid } }
+    NodeId: { name: node_id, in: path, required: true, schema: { type: string, format: uuid } }
+    PolicyId: { name: policy_id, in: path, required: true, schema: { type: string, format: uuid } }
+    RouteDefinitionId: { name: route_definition_id, in: path, required: true, schema: { type: string, format: uuid } }
+    VersionId: { name: version_id, in: path, required: true, schema: { type: string, format: uuid } }
+  requestBodies:
+    LifecycleCommand:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/LifecycleCommandRequest' } } }
+  schemas:
+    ResourceStatus: { type: string, enum: [ACTIVE, INACTIVE] }
+    VersionStatus: { type: string, enum: [DRAFT, VALIDATED, APPROVED, PUBLISHED, SUPERSEDED, ARCHIVED] }
+    NodeType: { type: string, enum: [BRANCH, HUB, GATEWAY, AGENT] }
+    NodeCapability: { type: string, enum: [PICKUP, CONSOLIDATION, GATEWAY, LINEHAUL, DELIVERY, CUSTOMER_HANDOFF] }
+    CoverageTarget: { type: string, enum: [PICKUP_SERVICE_AREA, DESTINATION_GATEWAY, LAST_MILE_NODE] }
+    RoutePurpose: { type: string, enum: [TRUNK, LAST_MILE] }
+    Point:
+      type: object
+      additionalProperties: false
+      required: [latitude, longitude]
+      properties: { latitude: { type: number, minimum: -90, maximum: 90 }, longitude: { type: number, minimum: -180, maximum: 180 } }
+    Address:
+      type: object
+      additionalProperties: false
+      required: [country_code]
+      properties:
+        country_code: { type: string, const: IR }
+        province_id: { type: [string, 'null'], format: uuid }
+        city_id: { type: [string, 'null'], format: uuid }
+        postal_code: { type: [string, 'null'], pattern: '^[0-9]{10}$' }
+        line: { type: [string, 'null'], maxLength: 1000 }
+        location: { oneOf: [{ $ref: '#/components/schemas/Point' }, { type: 'null' }] }
+    Area:
+      type: object
+      additionalProperties: false
+      required: [area_id, area_code, area_title, parent_area_id, status, version]
+      properties:
+        area_id: { type: string, format: uuid }
+        area_code: { type: string, maxLength: 80 }
+        area_title: { type: string, maxLength: 200 }
+        parent_area_id: { type: [string, 'null'], format: uuid }
+        status: { $ref: '#/components/schemas/ResourceStatus' }
+        version: { type: integer, minimum: 1 }
+    CreateAreaRequest:
+      type: object
+      additionalProperties: false
+      required: [area_code, area_title]
+      properties: { area_code: { type: string, maxLength: 80 }, area_title: { type: string, maxLength: 200 }, parent_area_id: { type: [string, 'null'], format: uuid } }
+    UpdateAreaRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties: { area_title: { type: string, maxLength: 200 }, parent_area_id: { type: [string, 'null'], format: uuid }, status: { $ref: '#/components/schemas/ResourceStatus' }, expected_version: { type: integer, minimum: 1 } }
+    Node:
+      type: object
+      additionalProperties: false
+      required: [node_id, area_id, node_code, node_title, node_type, capabilities, address, status, version]
+      properties:
+        node_id: { type: string, format: uuid }
+        area_id: { type: string, format: uuid }
+        node_code: { type: string, maxLength: 80 }
+        node_title: { type: string, maxLength: 200 }
+        node_type: { $ref: '#/components/schemas/NodeType' }
+        capabilities: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/NodeCapability' } }
+        address: { $ref: '#/components/schemas/Address' }
+        status: { $ref: '#/components/schemas/ResourceStatus' }
+        version: { type: integer, minimum: 1 }
+    CreateNodeRequest:
+      type: object
+      additionalProperties: false
+      required: [area_id, node_code, node_title, node_type, capabilities, address]
+      properties: { area_id: { type: string, format: uuid }, node_code: { type: string, maxLength: 80 }, node_title: { type: string, maxLength: 200 }, node_type: { $ref: '#/components/schemas/NodeType' }, capabilities: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/NodeCapability' } }, address: { $ref: '#/components/schemas/Address' } }
+    UpdateNodeRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties: { area_id: { type: string, format: uuid }, node_title: { type: string, maxLength: 200 }, node_type: { $ref: '#/components/schemas/NodeType' }, capabilities: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/NodeCapability' } }, address: { $ref: '#/components/schemas/Address' }, status: { $ref: '#/components/schemas/ResourceStatus' }, expected_version: { type: integer, minimum: 1 } }
+    ProvinceCriterion: { type: object, additionalProperties: false, required: [criterion_type, province_id], properties: { criterion_type: { const: PROVINCE }, province_id: { type: string, format: uuid } } }
+    CityCriterion: { type: object, additionalProperties: false, required: [criterion_type, city_id], properties: { criterion_type: { const: CITY }, city_id: { type: string, format: uuid } } }
+    PostalRangeCriterion: { type: object, additionalProperties: false, required: [criterion_type, postal_code_from, postal_code_to], properties: { criterion_type: { const: POSTAL_RANGE }, postal_code_from: { type: string, pattern: '^[0-9]{10}$' }, postal_code_to: { type: string, pattern: '^[0-9]{10}$' } } }
+    PolygonCriterion:
+      type: object
+      additionalProperties: false
+      required: [criterion_type, geometry]
+      properties:
+        criterion_type: { const: POLYGON }
+        geometry:
+          type: object
+          additionalProperties: false
+          required: [type, coordinates]
+          properties:
+            type: { type: string, enum: [Polygon, MultiPolygon] }
+            coordinates: { type: array, minItems: 1, items: {} }
+    PointRadiusCriterion: { type: object, additionalProperties: false, required: [criterion_type, center, radius_meters], properties: { criterion_type: { const: POINT_RADIUS }, center: { $ref: '#/components/schemas/Point' }, radius_meters: { type: integer, minimum: 1, maximum: 500000 } } }
+    CoverageCriterion: { oneOf: [{ $ref: '#/components/schemas/ProvinceCriterion' }, { $ref: '#/components/schemas/CityCriterion' }, { $ref: '#/components/schemas/PostalRangeCriterion' }, { $ref: '#/components/schemas/PolygonCriterion' }, { $ref: '#/components/schemas/PointRadiusCriterion' }], discriminator: { propertyName: criterion_type } }
+    CoverageRule:
+      type: object
+      additionalProperties: false
+      required: [coverage_rule_id, target, target_node_id, priority, offering_version_id, criterion]
+      properties: { coverage_rule_id: { type: string, format: uuid }, target: { $ref: '#/components/schemas/CoverageTarget' }, target_node_id: { type: string, format: uuid }, priority: { type: integer, minimum: -100000, maximum: 100000 }, offering_version_id: { type: [string, 'null'], format: uuid }, criterion: { $ref: '#/components/schemas/CoverageCriterion' } }
+    CoverageRuleInput:
+      type: object
+      additionalProperties: false
+      required: [target, target_node_id, priority, criterion]
+      properties: { target: { $ref: '#/components/schemas/CoverageTarget' }, target_node_id: { type: string, format: uuid }, priority: { type: integer, minimum: -100000, maximum: 100000 }, offering_version_id: { type: [string, 'null'], format: uuid }, criterion: { $ref: '#/components/schemas/CoverageCriterion' } }
+    CoveragePolicy:
+      type: object
+      additionalProperties: false
+      required: [coverage_policy_id, policy_code, policy_title, published_version_id]
+      properties: { coverage_policy_id: { type: string, format: uuid }, policy_code: { type: string, maxLength: 80 }, policy_title: { type: string, maxLength: 200 }, published_version_id: { type: [string, 'null'], format: uuid } }
+    CoveragePolicyVersion:
+      type: object
+      additionalProperties: false
+      required: [coverage_policy_version_id, coverage_policy_id, version_number, status, effective_from, effective_to, version, rules]
+      properties: { coverage_policy_version_id: { type: string, format: uuid }, coverage_policy_id: { type: string, format: uuid }, version_number: { type: integer, minimum: 1 }, status: { $ref: '#/components/schemas/VersionStatus' }, effective_from: { type: [string, 'null'], format: date-time }, effective_to: { type: [string, 'null'], format: date-time }, version: { type: integer, minimum: 1 }, rules: { type: array, items: { $ref: '#/components/schemas/CoverageRule' } } }
+    CreateCoveragePolicyRequest: { type: object, additionalProperties: false, required: [policy_code, policy_title], properties: { policy_code: { type: string, maxLength: 80 }, policy_title: { type: string, maxLength: 200 } } }
+    CreateCoverageVersionRequest: { type: object, additionalProperties: false, required: [rules], properties: { source_version_id: { type: [string, 'null'], format: uuid }, effective_from: { type: [string, 'null'], format: date-time }, effective_to: { type: [string, 'null'], format: date-time }, rules: { type: array, minItems: 1, items: { $ref: '#/components/schemas/CoverageRuleInput' } } } }
+    UpdateCoverageVersionRequest: { type: object, additionalProperties: false, required: [expected_version], minProperties: 2, properties: { effective_from: { type: [string, 'null'], format: date-time }, effective_to: { type: [string, 'null'], format: date-time }, rules: { type: array, minItems: 1, items: { $ref: '#/components/schemas/CoverageRuleInput' } }, expected_version: { type: integer, minimum: 1 } } }
+    RouteLegInput: { type: object, additionalProperties: false, required: [leg_order, origin_node_id, destination_node_id], properties: { leg_order: { type: integer, minimum: 1 }, origin_node_id: { type: string, format: uuid }, destination_node_id: { type: string, format: uuid } } }
+    RouteLeg: { allOf: [{ $ref: '#/components/schemas/RouteLegInput' }, { type: object, additionalProperties: false, required: [route_definition_leg_id], properties: { route_definition_leg_id: { type: string, format: uuid } } }] }
+    RouteDefinition: { type: object, additionalProperties: false, required: [route_definition_id, route_code, route_title, published_version_id], properties: { route_definition_id: { type: string, format: uuid }, route_code: { type: string, maxLength: 80 }, route_title: { type: string, maxLength: 200 }, published_version_id: { type: [string, 'null'], format: uuid } } }
+    RouteDefinitionVersion:
+      type: object
+      additionalProperties: false
+      required: [route_definition_version_id, route_definition_id, version_number, status, purpose, origin_node_id, destination_node_id, priority, offering_version_id, effective_from, effective_to, version, legs]
+      properties: { route_definition_version_id: { type: string, format: uuid }, route_definition_id: { type: string, format: uuid }, version_number: { type: integer, minimum: 1 }, status: { $ref: '#/components/schemas/VersionStatus' }, purpose: { $ref: '#/components/schemas/RoutePurpose' }, origin_node_id: { type: string, format: uuid }, destination_node_id: { type: string, format: uuid }, priority: { type: integer, minimum: -100000, maximum: 100000 }, offering_version_id: { type: [string, 'null'], format: uuid }, effective_from: { type: [string, 'null'], format: date-time }, effective_to: { type: [string, 'null'], format: date-time }, version: { type: integer, minimum: 1 }, legs: { type: array, minItems: 1, items: { $ref: '#/components/schemas/RouteLeg' } } }
+    CreateRouteDefinitionRequest: { type: object, additionalProperties: false, required: [route_code, route_title], properties: { route_code: { type: string, maxLength: 80 }, route_title: { type: string, maxLength: 200 } } }
+    CreateRouteVersionRequest: { type: object, additionalProperties: false, required: [purpose, origin_node_id, destination_node_id, priority, legs], properties: { source_version_id: { type: [string, 'null'], format: uuid }, purpose: { $ref: '#/components/schemas/RoutePurpose' }, origin_node_id: { type: string, format: uuid }, destination_node_id: { type: string, format: uuid }, priority: { type: integer, minimum: -100000, maximum: 100000 }, offering_version_id: { type: [string, 'null'], format: uuid }, effective_from: { type: [string, 'null'], format: date-time }, effective_to: { type: [string, 'null'], format: date-time }, legs: { type: array, minItems: 1, items: { $ref: '#/components/schemas/RouteLegInput' } } } }
+    UpdateRouteVersionRequest: { type: object, additionalProperties: false, required: [expected_version], minProperties: 2, properties: { priority: { type: integer, minimum: -100000, maximum: 100000 }, offering_version_id: { type: [string, 'null'], format: uuid }, effective_from: { type: [string, 'null'], format: date-time }, effective_to: { type: [string, 'null'], format: date-time }, legs: { type: array, minItems: 1, items: { $ref: '#/components/schemas/RouteLegInput' } }, expected_version: { type: integer, minimum: 1 } } }
+    LifecycleCommandRequest: { type: object, additionalProperties: false, required: [expected_version], properties: { expected_version: { type: integer, minimum: 1 }, note: { type: [string, 'null'], maxLength: 500 } } }
+    Pagination: { type: object, additionalProperties: false, required: [page, page_size, total, total_pages], properties: { page: { type: integer }, page_size: { type: integer }, total: { type: integer }, total_pages: { type: integer } } }
+    ListMeta: { type: object, additionalProperties: false, required: [pagination], properties: { pagination: { $ref: '#/components/schemas/Pagination' } } }
+    DetailMeta: { type: object, additionalProperties: false }
+    AreaListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/Area' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    AreaEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/Area' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    NodeListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/Node' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    NodeEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/Node' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    CoveragePolicyListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/CoveragePolicy' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    CoveragePolicyEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/CoveragePolicy' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    CoverageVersionEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/CoveragePolicyVersion' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    CoverageVersionListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/CoveragePolicyVersion' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    RouteDefinitionListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/RouteDefinition' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    RouteDefinitionEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/RouteDefinition' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    RouteVersionEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/RouteDefinitionVersion' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    RouteVersionListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/RouteDefinitionVersion' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    ErrorCode: { type: string, enum: [VALIDATION_ERROR, AUTHENTICATION_REQUIRED, FORBIDDEN, TENANT_ACCESS_DENIED, ENTITLEMENT_DISABLED, PERMISSION_DENIED, SCOPE_ACCESS_DENIED, RESOURCE_NOT_FOUND, VERSION_CONFLICT, IDEMPOTENCY_KEY_REUSED, COVERAGE_NOT_FOUND, COVERAGE_AMBIGUOUS, ROUTE_NOT_FOUND, ROUTE_AMBIGUOUS, CONFIG_VERSION_UNAVAILABLE, INTERNAL_SERVER_ERROR] }
+    ErrorEnvelope: { type: object, additionalProperties: false, required: [error_code, message, field_errors, details, correlation_id], properties: { error_code: { $ref: '#/components/schemas/ErrorCode' }, message: { type: string }, field_errors: { type: object, additionalProperties: { type: array, items: { type: string } } }, details: { type: object, additionalProperties: true }, correlation_id: { type: string, format: uuid } } }
+  responses:
+    AreaList: { description: Current-HQ Areas., content: { application/json: { schema: { $ref: '#/components/schemas/AreaListEnvelope' } } } }
+    AreaDetail: { description: Current-HQ Area., content: { application/json: { schema: { $ref: '#/components/schemas/AreaEnvelope' } } } }
+    NodeList: { description: Current-HQ Nodes., content: { application/json: { schema: { $ref: '#/components/schemas/NodeListEnvelope' } } } }
+    NodeDetail: { description: Current-HQ Node., content: { application/json: { schema: { $ref: '#/components/schemas/NodeEnvelope' } } } }
+    CoveragePolicyList: { description: Current-HQ Coverage Policies., content: { application/json: { schema: { $ref: '#/components/schemas/CoveragePolicyListEnvelope' } } } }
+    CoveragePolicyDetail: { description: Coverage Policy identity., content: { application/json: { schema: { $ref: '#/components/schemas/CoveragePolicyEnvelope' } } } }
+    CoverageVersionDetail: { description: Coverage Policy Version., content: { application/json: { schema: { $ref: '#/components/schemas/CoverageVersionEnvelope' } } } }
+    CoverageVersionList: { description: Coverage Policy version history., content: { application/json: { schema: { $ref: '#/components/schemas/CoverageVersionListEnvelope' } } } }
+    RouteDefinitionList: { description: Current-HQ Route Definitions., content: { application/json: { schema: { $ref: '#/components/schemas/RouteDefinitionListEnvelope' } } } }
+    RouteDefinitionDetail: { description: Route Definition identity., content: { application/json: { schema: { $ref: '#/components/schemas/RouteDefinitionEnvelope' } } } }
+    RouteVersionDetail: { description: Route Definition Version., content: { application/json: { schema: { $ref: '#/components/schemas/RouteVersionEnvelope' } } } }
+    RouteVersionList: { description: Route Definition version history., content: { application/json: { schema: { $ref: '#/components/schemas/RouteVersionListEnvelope' } } } }
+    Unauthenticated: { description: Authentication is required., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Forbidden: { description: 'Tenant, entitlement, permission, or scope denied.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    NotFound: { description: Resource is absent or not visible., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Conflict: { description: 'Version, identifier, or idempotency conflict.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Unprocessable: { description: 'Validation, lifecycle, or domain-policy rejection.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }

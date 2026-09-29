@@ -1,0 +1,16 @@
+{
+  "name": "@chabok/openapi",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.16.0"
+  },
+  "scripts": {
+    "lint": "redocly lint --config redocly.yaml v1/iam.yaml v1/consignments.yaml v1/manifests.yaml v1/dashboard.yaml v1/service-catalog.yaml v1/pricing.yaml v1/geography.yaml v1/operations.yaml v1/network.yaml v1/fleet.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.40.0"
+  }
+}

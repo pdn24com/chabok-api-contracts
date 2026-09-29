@@ -1,0 +1,523 @@
+openapi: 3.1.0
+info:
+  title: Chabok Branch Operations Dashboard API
+  version: 1.0.0
+  description: |
+    Read-only Branch Operations Dashboard contract derived from the governing
+    implementation baseline, the current Product Owner Dashboard instruction,
+    ERS v1.7, State Transition Matrix v2.2 with the baseline D01 correction,
+    Permission Matrix v2.4, and the approved Dashboard v1 design.
+    Values are live tenant/node-scoped snapshots. Unknown and unimplemented
+    values are null and never represented by fabricated zeroes.
+servers:
+  - url: /api/v1
+tags:
+  - name: Dashboard
+    description: Permission-aware operational read model for the selected node.
+security:
+  - bearerAuth: []
+paths:
+  /dashboard/operations:
+    get:
+      tags: [Dashboard]
+      operationId: getBranchOperationsDashboard
+      summary: Read the current Branch Operations Dashboard
+      x-chabok-source: SCR-001, PO-DASH-01, approved Branch Operations Dashboard v1
+      x-chabok-approval-status: approved-current-slice
+      description: |
+        Returns only live current-state metrics supported by authoritative
+        persistence. Operational-date and shift filtering are intentionally not
+        accepted because no authoritative membership rule is implemented.
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Permission-filtered tenant/node operational snapshot.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    CorrelationId:
+      description: Request correlation identifier.
+      schema:
+        type: string
+        format: uuid
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    NodeId:
+      name: X-Node-Id
+      in: header
+      required: true
+      description: |
+        Operational context validated against server-resolved tenant and scope.
+        It never establishes or overrides tenant identity.
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CapabilityStatus:
+      type: string
+      enum: [AVAILABLE, PARTIAL, UNAVAILABLE, STALE]
+    CapabilityReasonCode:
+      type: string
+      enum:
+        - ENTITLEMENT_DISABLED
+        - PERMISSION_DENIED
+        - MODULE_NOT_IMPLEMENTED
+        - DATA_NOT_PERSISTED
+        - OPERATIONAL_DATE_FILTER_UNSUPPORTED
+        - SHIFT_FILTER_UNSUPPORTED
+        - COMPARISON_UNAVAILABLE
+        - SECTION_PERMISSION_FILTERED
+        - NO_VISIBLE_AUDIT_TARGETS
+    NullableReasonCode:
+      anyOf:
+        - $ref: '#/components/schemas/CapabilityReasonCode'
+        - type: 'null'
+    NullableInteger:
+      type: [integer, 'null']
+      minimum: 0
+    NullableString:
+      type: [string, 'null']
+    CapabilityBase:
+      type: object
+      required: [status, as_of, reason_code]
+      properties:
+        status:
+          $ref: '#/components/schemas/CapabilityStatus'
+        as_of:
+          type: string
+          format: date-time
+        reason_code:
+          $ref: '#/components/schemas/NullableReasonCode'
+    DashboardNode:
+      type: object
+      additionalProperties: false
+      required: [node_id, node_code, node_title, node_type]
+      properties:
+        node_id:
+          type: string
+          format: uuid
+        node_code:
+          type: string
+        node_title:
+          type: string
+        node_type:
+          type: string
+    FilterCapability:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [key, value]
+          properties:
+            key:
+              type: string
+              enum: [OPERATIONAL_DATE, SHIFT]
+            value:
+              $ref: '#/components/schemas/NullableString'
+    MetricComparison:
+      type: object
+      additionalProperties: false
+      required: [value, direction, period_label]
+      properties:
+        value:
+          type: number
+        direction:
+          type: string
+          enum: [UP, DOWN, FLAT]
+        period_label:
+          type: string
+    DashboardMetric:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [key, value, comparison]
+          properties:
+            key:
+              type: string
+              enum:
+                - ACTIVE_CONSIGNMENTS
+                - OPEN_MANIFESTS
+                - AWAITING_NOK_REVIEW
+                - AWAITING_NPU_REVIEW
+                - OPEN_PICKUP_REQUESTS
+                - ACTIVE_DELAYS
+                - SLA_RISK
+                - ACTIVE_DRIVERS
+            value:
+              $ref: '#/components/schemas/NullableInteger'
+            comparison:
+              anyOf:
+                - $ref: '#/components/schemas/MetricComparison'
+                - type: 'null'
+    ConsignmentStatusCounts:
+      type: object
+      additionalProperties: false
+      required:
+        - D00
+        - CFM
+        - PD
+        - PU
+        - IR
+        - ROU
+        - OF
+        - OS
+        - CI
+        - OD
+        - OK
+        - NPU
+        - NOK
+        - RH
+        - RCH
+        - RO
+        - AA
+      properties:
+        D00: { type: integer, minimum: 0 }
+        CFM: { type: integer, minimum: 0 }
+        PD: { type: integer, minimum: 0 }
+        PU: { type: integer, minimum: 0 }
+        IR: { type: integer, minimum: 0 }
+        ROU: { type: integer, minimum: 0 }
+        OF: { type: integer, minimum: 0 }
+        OS: { type: integer, minimum: 0 }
+        CI: { type: integer, minimum: 0 }
+        OD: { type: integer, minimum: 0 }
+        OK: { type: integer, minimum: 0 }
+        NPU: { type: integer, minimum: 0 }
+        NOK: { type: integer, minimum: 0 }
+        RH: { type: integer, minimum: 0 }
+        RCH: { type: integer, minimum: 0 }
+        RO: { type: integer, minimum: 0 }
+        AA: { type: integer, minimum: 0 }
+    ConsignmentSummary:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [total, active, status_counts]
+          properties:
+            total:
+              $ref: '#/components/schemas/NullableInteger'
+            active:
+              $ref: '#/components/schemas/NullableInteger'
+            status_counts:
+              anyOf:
+                - $ref: '#/components/schemas/ConsignmentStatusCounts'
+                - type: 'null'
+    ManifestStateCounts:
+      type: object
+      additionalProperties: false
+      required: [DRAFT, OPEN, CLOSED]
+      properties:
+        DRAFT: { type: integer, minimum: 0 }
+        OPEN: { type: integer, minimum: 0 }
+        CLOSED: { type: integer, minimum: 0 }
+    ManifestTargetStatusCounts:
+      type: object
+      additionalProperties: false
+      required: [IR, OF, OD]
+      properties:
+        IR: { type: integer, minimum: 0 }
+        OF: { type: integer, minimum: 0 }
+        OD: { type: integer, minimum: 0 }
+    ManifestSummary:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [total, open, failed_rows, state_counts, target_status_counts]
+          properties:
+            total:
+              $ref: '#/components/schemas/NullableInteger'
+            open:
+              $ref: '#/components/schemas/NullableInteger'
+            failed_rows:
+              $ref: '#/components/schemas/NullableInteger'
+            state_counts:
+              anyOf:
+                - $ref: '#/components/schemas/ManifestStateCounts'
+                - type: 'null'
+            target_status_counts:
+              anyOf:
+                - $ref: '#/components/schemas/ManifestTargetStatusCounts'
+                - type: 'null'
+    UnavailableDomainSummary:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [total, status_counts]
+          properties:
+            total:
+              $ref: '#/components/schemas/NullableInteger'
+            status_counts:
+              type: 'null'
+    DriverStatusCounts:
+      type: object
+      additionalProperties: false
+      required: [AVAILABLE, ON_MISSION]
+      properties:
+        AVAILABLE: { type: integer, minimum: 0 }
+        ON_MISSION: { type: integer, minimum: 0 }
+    DriverSummary:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [total, status_counts]
+          properties:
+            total:
+              $ref: '#/components/schemas/NullableInteger'
+            status_counts:
+              anyOf:
+                - $ref: '#/components/schemas/DriverStatusCounts'
+                - type: 'null'
+    AttentionItem:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - severity
+        - title
+        - entity_type
+        - public_identifier
+        - occurred_at
+        - navigation_target
+        - action_available
+      properties:
+        type:
+          type: string
+          enum: [CONSIGNMENT_NOK, CONSIGNMENT_NPU, MANIFEST_VALIDATION_FAILURE]
+        severity:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM]
+        title:
+          type: string
+        entity_type:
+          type: string
+          enum: [CONSIGNMENT, MANIFEST]
+        public_identifier:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        navigation_target:
+          type: string
+          pattern: '^/'
+        action_available:
+          type: boolean
+    AttentionSection:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              maxItems: 6
+              items:
+                $ref: '#/components/schemas/AttentionItem'
+    OperationalUpdate:
+      type: object
+      additionalProperties: false
+      required:
+        - audit_id
+        - action_key
+        - title
+        - entity_type
+        - public_identifier
+        - occurred_at
+        - navigation_target
+      properties:
+        audit_id:
+          type: string
+          format: uuid
+        action_key:
+          type: string
+          enum:
+            - CONSIGNMENT_CREATED
+            - CONSIGNMENT_UPDATED
+            - MANIFEST_CREATED
+            - MANIFEST_CONTEXT_UPDATED
+            - MANIFEST_PARCELS_ADDED
+            - MANIFEST_VALIDATED
+            - MANIFEST_CONFIRMED
+        title:
+          type: string
+        entity_type:
+          type: string
+          enum: [CONSIGNMENT, MANIFEST]
+        public_identifier:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        navigation_target:
+          type: string
+          pattern: '^/'
+    UpdatesSection:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/CapabilityBase'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              maxItems: 6
+              items:
+                $ref: '#/components/schemas/OperationalUpdate'
+    DashboardShortcut:
+      type: object
+      additionalProperties: false
+      required: [key, status, reason_code, navigation_target]
+      properties:
+        key:
+          type: string
+          enum:
+            - CONSIGNMENTS
+            - CREATE_CONSIGNMENT
+            - MANIFESTS
+            - CREATE_MANIFEST
+            - PICKUP_REQUESTS
+            - DRIVERS
+            - LIVE_OPERATIONS
+            - EXCEPTIONS
+        status:
+          $ref: '#/components/schemas/CapabilityStatus'
+        reason_code:
+          $ref: '#/components/schemas/NullableReasonCode'
+        navigation_target:
+          type: [string, 'null']
+          pattern: '^/'
+    DashboardOperations:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - as_of
+        - node
+        - filters
+        - metrics
+        - attention
+        - consignments
+        - pickup_requests
+        - manifests
+        - drivers
+        - latest_updates
+        - shortcuts
+      properties:
+        status:
+          $ref: '#/components/schemas/CapabilityStatus'
+        as_of:
+          type: string
+          format: date-time
+        node:
+          $ref: '#/components/schemas/DashboardNode'
+        filters:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/FilterCapability'
+        metrics:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/DashboardMetric'
+        attention:
+          $ref: '#/components/schemas/AttentionSection'
+        consignments:
+          $ref: '#/components/schemas/ConsignmentSummary'
+        pickup_requests:
+          $ref: '#/components/schemas/UnavailableDomainSummary'
+        manifests:
+          $ref: '#/components/schemas/ManifestSummary'
+        drivers:
+          $ref: '#/components/schemas/DriverSummary'
+        latest_updates:
+          $ref: '#/components/schemas/UpdatesSection'
+        shortcuts:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/DashboardShortcut'
+    DashboardSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          $ref: '#/components/schemas/DashboardOperations'
+        meta:
+          type: object
+          additionalProperties: false
+        correlation_id:
+          type: string
+          format: uuid
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, field_errors, details, correlation_id]
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+        details:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+  responses:
+    AuthenticationRequired:
+      description: Authentication is required or the session is no longer valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Tenant, entitlement, permission, or operational scope denied.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unprocessable:
+      description: Header or request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'

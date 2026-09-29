@@ -1,0 +1,2204 @@
+openapi: 3.1.0
+info:
+  title: Chabok IAM Sprint 0 API
+  version: 1.0.0-approved-readiness
+  description: |
+    Approved implementation-readiness contract derived from Chabok IAM Sprint 0
+    API Contract v1.1. The operation inventory remains exactly the 34 supplied
+    operations. S0-01 through S0-03 are implemented; S0-04 through S0-06
+    remain blocked pending their separately authorized implementation stages.
+servers:
+  - url: /api/v1
+tags:
+  - name: Authentication
+  - name: Current User
+  - name: Context
+  - name: Users
+  - name: Roles
+  - name: Permissions
+  - name: Assignments
+  - name: Entitlements
+security:
+  - bearerAuth: []
+x-chabok-branch-web-security:
+  extension: IAM-EXT-012
+  deployment: same-site
+  transport: TLS is required for all authentication, OTP, invitation, and temporary-password requests.
+  origin_validation: Refresh, logout, and logout-all require an exact configured Branch Panel Origin.
+  credentialed_cors: Allowed only for explicitly configured origins; wildcard credentialed origins are prohibited.
+  negative_tests: Missing and foreign Origin, unconfigured credentialed CORS, and SameSite regressions block release.
+  csrf_change_control: A cross-site deployment requires a separately approved additional CSRF token mechanism.
+x-chabok-forced-password-session:
+  extension: IAM-EXT-011
+  allowed_operation_ids: [changePassword, refreshSession, logout, logoutAll]
+  prohibited_status: 403
+  prohibited_error_code: PASSWORD_CHANGE_REQUIRED
+  description: Every other protected operation is denied while must_change_password is true.
+paths:
+  /iam/assignment-options:
+    get:
+      tags: [Assignments]
+      operationId: getAssignmentOptions
+      parameters:
+        - name: role_id
+          in: query
+          description: Further restrict scopes to those covering every permission of this role.
+          schema: { type: string, format: uuid }
+      summary: List named delegation scopes with hierarchical area paths
+      description: Options are bounded by the caller's role-assignment authority. Every write independently validates the permission bundle and scope including descendants.
+      responses:
+        '200':
+          description: Allowed scopes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/DataEnvelopeBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AssignmentOptions' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /iam/users/{user_id}/operational-profile:
+    post:
+      tags: [Users]
+      operationId: attachOperationalProfile
+      summary: Create or link an operational profile to an existing user atomically
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [operational_profile]
+              properties:
+                operational_profile: { $ref: '#/components/schemas/OperationalProfileInput' }
+      responses:
+        '200':
+          description: Profile attached and optional Node assignment created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/DataEnvelopeBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          driver_profile: { $ref: '#/components/schemas/DriverProfileReference' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Log in with a globally unique username, mobile, or email
+      security: []
+      x-chabok-source: IAM API v1.1 sections 2.1 and 9.1
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Access token and current context; refresh token is set only as an HttpOnly cookie
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginSuccess'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      operationId: refreshSession
+      summary: Rotate the Branch Panel web refresh cookie and issue an access token
+      security:
+        - refreshCookie: []
+      x-chabok-source: IAM API v1.1 section 2 plus current Branch Panel web amendment
+      x-chabok-approval-status: locked-IAM-EXT-012
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/BranchPanelOrigin'
+      responses:
+        '200':
+          description: Rotated session; no refresh token is returned in JSON
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/OriginForbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: Revoke the current session and expire the Branch Panel refresh cookie
+      description: A valid refresh cookie may authenticate this command when the access token has expired. Origin validation occurs before revocation or cookie-clearing response handling.
+      security:
+        - refreshCookie: []
+        - bearerAuth: []
+      x-chabok-source: IAM API v1.1 section 2 plus IAM-EXT-012 and IAM-EXT-013
+      x-chabok-approval-status: locked-IAM-EXT-012-IAM-EXT-013
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/BranchPanelOrigin'
+      responses:
+        '200':
+          description: Session revoked or already unavailable; refresh cookie expired
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/ClearRefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessFlagEnvelope'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/OriginForbidden'
+  /auth/logout-all:
+    post:
+      tags: [Authentication]
+      operationId: logoutAll
+      summary: Revoke all current-user sessions and expire the Branch Panel refresh cookie
+      security:
+        - refreshCookie: []
+        - bearerAuth: []
+      x-chabok-source: IAM API v1.1 section 2 plus IAM-EXT-012 and IAM-EXT-013
+      x-chabok-approval-status: locked-IAM-EXT-012-IAM-EXT-013
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/BranchPanelOrigin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutAllRequest'
+      responses:
+        '200':
+          description: Sessions revoked
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/ClearRefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokedCountSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/OriginForbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /auth/otp/send:
+    post:
+      tags: [Authentication]
+      operationId: sendOtp
+      summary: Send an activation or password-reset OTP
+      description: For password recovery, known and unknown identifiers receive externally equivalent safe responses and comparable work/timing. The response never confirms account existence or delivery.
+      security: []
+      x-chabok-source: IAM API v1.1 section 2 plus IAM-EXT-015
+      x-chabok-approval-status: locked-IAM-EXT-015
+      x-chabok-account-enumeration-safe: true
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpSendRequest'
+      responses:
+        '200':
+          description: Safe challenge acknowledgement; challenge metadata does not confirm account existence or delivery
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpChallengeSuccess'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/otp/verify:
+    post:
+      tags: [Authentication]
+      operationId: verifyOtp
+      summary: Verify an OTP challenge
+      security: []
+      x-chabok-source: IAM API v1.1 section 2
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Verification token issued
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationTokenSuccess'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/password/activate:
+    post:
+      tags: [Authentication]
+      operationId: activatePassword
+      summary: Set an initial password using a verification or invitation token
+      security: []
+      x-chabok-source: IAM API v1.1 section 2 plus IAM-EXT-014
+      x-chabok-approval-status: locked-backend-endpoint-IAM-EXT-014
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      description: This backend endpoint does not authorize an invitation-acceptance Branch Panel screen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordActivateRequest'
+      responses:
+        '200':
+          description: User activated
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStatusSuccess'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /auth/password/reset:
+    post:
+      tags: [Authentication]
+      operationId: resetPassword
+      summary: Reset password and revoke existing sessions
+      security: []
+      x-chabok-source: IAM API v1.1 section 2
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Password reset
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokedCountSuccess'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /auth/password/change:
+    post:
+      tags: [Authentication]
+      operationId: changePassword
+      summary: Change current password and clear forced-password state
+      x-chabok-source: IAM API v1.1 section 2
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessFlag'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /me:
+    get:
+      tags: [Current User]
+      operationId: getMe
+      summary: Get current profile and effective roles
+      x-chabok-source: IAM API v1.1 section 3
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Current user
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+  /me/context:
+    get:
+      tags: [Current User]
+      operationId: getMyContext
+      summary: Get effective permissions, scopes, nodes, and entitlements
+      x-chabok-source: IAM API v1.1 sections 3.1 and 9.2
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Current authorization and operational context
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+  /me/profile:
+    patch:
+      tags: [Current User]
+      operationId: updateMyProfile
+      summary: Update limited self-service profile fields
+      x-chabok-source: IAM API v1.1 section 3
+      x-chabok-approval-status: locked-IAM-EXT-003
+      x-chabok-backlog-status: sprint-0-should
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfProfileUpdateRequest'
+      responses:
+        '200':
+          description: Updated user
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /me/sessions:
+    get:
+      tags: [Current User]
+      operationId: listMySessions
+      summary: List current-user sessions without token hashes
+      x-chabok-source: IAM API v1.1 section 3
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Sessions
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListSuccess'
+  /me/sessions/{session_id}:
+    delete:
+      tags: [Current User]
+      operationId: revokeMySession
+      summary: Revoke one owned session
+      x-chabok-source: IAM API v1.1 section 3
+      x-chabok-approval-status: locked
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessFlag'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /context/nodes:
+    get:
+      tags: [Context]
+      operationId: listAccessibleNodes
+      summary: List nodes accessible through assignments and area descendants
+      x-chabok-source: IAM API v1.1 section 3
+      x-chabok-approval-status: locked
+      x-required-permission: node_context.view
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Accessible nodes
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeListSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /iam/users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List and filter users within administrative authority
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked
+      x-required-permission: iam.users.view
+      x-chabok-backlog-status: sprint-0-backend-must-ui-deferred
+      parameters:
+        - name: node_id
+          in: query
+          description: Users with effective active assignments covering this node, including area and tenant assignments.
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserStatus'
+        - name: role_code
+          in: query
+          schema:
+            type: string
+        - name: scope_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Users
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a Direct Active or Invited user
+      description: DIRECT_ACTIVE requires a caller-supplied policy-valid temporary password over TLS and sets must_change_password=true. Invitation modes reject temporary_password and use activation; no password is returned.
+      x-chabok-source: IAM API v1.1 sections 4 and 4.1 plus IAM-EXT-006
+      x-chabok-approval-status: locked-IAM-EXT-006
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}:
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get user, assignments, invitation state, and session summary
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked
+      x-required-permission: iam.users.view
+      x-chabok-backlog-status: sprint-0-backend-must-ui-deferred
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update allowed user profile fields
+      description: Only first_name, last_name, and display_name are mutable. Username, mobile, and email require a later verified-identifier workflow.
+      x-chabok-source: IAM API v1.1 section 4 plus IAM-EXT-004
+      x-chabok-approval-status: locked-IAM-EXT-004
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-backend-must-ui-deferred
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdateRequest'
+      responses:
+        '200':
+          description: Updated user
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/suspend:
+    post:
+      tags: [Users]
+      operationId: suspendUser
+      summary: Suspend a user and revoke sessions
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserStatusChanged'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/activate:
+    post:
+      tags: [Users]
+      operationId: activateUser
+      summary: Activate or reactivate a user
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserStatusChanged'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/deactivate:
+    post:
+      tags: [Users]
+      operationId: deactivateUser
+      summary: Deactivate a user and revoke sessions
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserStatusChanged'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/invite:
+    post:
+      tags: [Users]
+      operationId: inviteUser
+      summary: Send or resend an SMS/email invitation
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked-IAM-EXT-005
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteUserRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessFlag'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/temporary-password:
+    post:
+      tags: [Users]
+      operationId: issueTemporaryPassword
+      summary: Set a caller-supplied temporary password
+      description: Server generation is deferred. The password is accepted only over TLS, validated against policy, never returned or logged, and sets must_change_password=true.
+      x-chabok-source: IAM API v1.1 section 4 plus IAM-EXT-006
+      x-chabok-approval-status: locked-IAM-EXT-006
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemporaryPasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessFlag'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/revoke-sessions:
+    post:
+      tags: [Users]
+      operationId: revokeUserSessions
+      summary: Revoke every active session for a user
+      x-chabok-source: IAM API v1.1 section 4
+      x-chabok-approval-status: locked
+      x-required-permission: iam.users.manage
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Sessions revoked
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokedCountSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /iam/roles:
+    post:
+      tags: [Roles]
+      operationId: createRole
+      summary: Create a tenant custom role with explicitly selected permissions
+      description: Requires tenant-scoped iam.roles.manage. Grants must be active, entitled and within the actor's tenant-wide authority. Creates no user assignment. Audited and transactional; Idempotency-Key safely replays retries.
+      x-required-permission: iam.roles.manage
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+      responses:
+        '201':
+          description: Custom role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    get:
+      tags: [Roles]
+      operationId: listRoles
+      summary: List system, template, and tenant custom roles
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked
+      x-required-permissions-any: [iam.roles.assign, iam.roles.manage]
+      x-chabok-backlog-status: sprint-0-must
+      description: Requires IAM entitlement and either role assignment or role management permission in the current tenant. Includes inactive catalog records for inspection and recovery.
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Roles
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleListSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /iam/roles/{role_id}:
+    get:
+      tags: [Roles]
+      operationId: getRole
+      summary: Get role detail and permission codes
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked
+      x-required-permissions-any: [iam.roles.assign, iam.roles.manage]
+      x-chabok-backlog-status: sprint-0-must
+      description: Requires IAM entitlement and either role assignment or role management permission in the current tenant. Includes inactive catalog records for inspection and recovery.
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/RoleId'
+      responses:
+        '200':
+          description: Role
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [Roles]
+      operationId: updateRole
+      summary: Edit tenant custom role metadata/status
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked-IAM-EXT-007
+      x-required-permission: iam.roles.manage
+      x-chabok-backlog-status: carryover-should
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/RoleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+      responses:
+        '200':
+          description: Updated role
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/roles/{role_id}/clone:
+    post:
+      tags: [Roles]
+      operationId: cloneRole
+      summary: Clone a cloneable role/template into a tenant custom role
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked-IAM-EXT-007
+      x-required-permission: iam.roles.manage
+      x-chabok-backlog-status: carryover-should
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/RoleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCloneRequest'
+      responses:
+        '201':
+          description: Cloned custom role
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/roles/{role_id}/permissions:
+    put:
+      tags: [Roles]
+      operationId: replaceRolePermissions
+      summary: Replace permission grants on a tenant custom role
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked-IAM-EXT-008
+      x-required-permission: iam.roles.manage
+      x-chabok-backlog-status: carryover-should
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/RoleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceRolePermissionsRequest'
+      responses:
+        '200':
+          description: Updated role
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/permissions:
+    get:
+      tags: [Permissions]
+      operationId: listPermissions
+      summary: Read the global permission catalog filtered by module
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked
+      x-required-permissions-any: [iam.roles.assign, iam.roles.manage]
+      x-chabok-backlog-status: sprint-0-must
+      description: Requires IAM entitlement and either role assignment or role management permission in the current tenant. Includes inactive catalog records for inspection and recovery.
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - name: module_code
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Permissions
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionListSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /iam/users/{user_id}/role-assignments:
+    post:
+      tags: [Assignments]
+      operationId: createRoleAssignments
+      summary: Create one or more scoped role assignments
+      x-chabok-source: IAM API v1.1 section 5 and Create User assignment definition
+      x-chabok-approval-status: locked-IAM-EXT-009
+      x-required-permission: iam.roles.assign
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssignmentsRequest'
+      responses:
+        '201':
+          description: Assignments created
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentListSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/users/{user_id}/role-assignments/{assignment_id}:
+    patch:
+      tags: [Assignments]
+      operationId: updateRoleAssignment
+      summary: Atomically replace a role assignment while preserving revoked history
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/AssignmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignmentInput' }
+      responses:
+        '200':
+          description: Replacement assignment
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/DataEnvelopeBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Assignment' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Assignments]
+      operationId: revokeRoleAssignment
+      summary: Revoke a scoped role assignment without deleting history
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked
+      x-required-permission: iam.roles.assign
+      x-chabok-backlog-status: sprint-0-must
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/AssignmentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessFlag'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /iam/module-entitlements:
+    get:
+      tags: [Entitlements]
+      operationId: listModuleEntitlements
+      summary: Read tenant module entitlement status
+      x-chabok-source: IAM API v1.1 section 5
+      x-chabok-approval-status: locked
+      x-required-permission: iam.entitlements.view
+      x-chabok-backlog-status: sprint-0-backend-must-ui-deferred
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Entitlements
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntitlementListSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: chabok_refresh
+      description: Secure, HttpOnly, SameSite rotating opaque token for Branch Panel web
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Optional UUID propagated or replaced by a server-generated value; the response header and body correlation_id agree
+      schema:
+        type: string
+        format: uuid
+    NodeId:
+      name: X-Node-Id
+      in: header
+      required: false
+      description: Optional operational context hint validated against authenticated access; never establishes or overrides tenant identity
+      schema:
+        type: string
+        format: uuid
+    BranchPanelOrigin:
+      name: Origin
+      in: header
+      required: true
+      description: Must exactly match an explicitly configured Branch Panel origin; validated before cookie-authenticated command handling
+      schema:
+        type: string
+        format: uri
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RoleId:
+      name: role_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssignmentId:
+      name: assignment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+        maxLength: 200
+  headers:
+    CorrelationId:
+      description: Accepted or generated correlation UUID; agrees with the response body correlation_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RefreshCookie:
+      description: Rotating Branch Panel refresh cookie; never exposed to JavaScript
+      schema:
+        type: string
+        example: chabok_refresh=opaque; Path=/api/v1/auth; Secure; HttpOnly; SameSite=Lax
+    ClearRefreshCookie:
+      description: Expire the Branch Panel refresh cookie using the same name, path, security attributes, and SameSite policy
+      schema:
+        type: string
+        example: chabok_refresh=; Path=/api/v1/auth; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=Lax
+  responses:
+    InvalidCredentials:
+      description: Unknown identifier and wrong password use the same public response
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error_code: INVALID_CREDENTIALS
+            message: Invalid credentials.
+            field_errors: {}
+            details: {}
+            correlation_id: 018f77b6-7c5e-7c39-b4e2-111111111111
+    AuthenticationRequired:
+      description: Authentication required, session revoked, or refresh-token reuse detected; the specific reuse cause is restricted to safe internal telemetry
+      x-chabok-error-codes:
+        - AUTHENTICATION_REQUIRED
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Inactive user, tenant, entitlement, permission, scope denial, or 403 PASSWORD_CHANGE_REQUIRED for a restricted forced-password session
+      x-chabok-error-codes:
+        - PASSWORD_CHANGE_REQUIRED
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    OriginForbidden:
+      description: Missing or unconfigured Origin; no credentialed CORS permission is emitted
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Identifier, idempotency, or concurrency conflict
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unprocessable:
+      description: Validation, lifecycle, or domain-policy rejection
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    SuccessFlag:
+      description: Command succeeded
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SuccessFlagEnvelope'
+    UserStatusChanged:
+      description: User lifecycle status changed
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserStatusSuccess'
+  schemas:
+    AssignmentOptions:
+      type: object
+      required: [tenant_allowed, areas, nodes]
+      properties:
+        tenant_allowed: { type: boolean }
+        areas:
+          type: array
+          items:
+            type: object
+            required: [area_id, area_title, path, can_include_descendants]
+            properties:
+              area_id: { type: string, format: uuid }
+              area_title: { type: string }
+              path: { type: string }
+              can_include_descendants: { type: boolean }
+        nodes:
+          type: array
+          items:
+            type: object
+            required: [node_id, node_title, node_code, node_type, area_id]
+            properties:
+              node_id: { type: string, format: uuid }
+              node_title: { type: string }
+              node_code: { type: string }
+              node_type: { type: string }
+              area_id: { type: string, format: uuid }
+    OnboardingDriver:
+      type: object
+      additionalProperties: false
+      required: [driver_code, display_name, home_node_id, capabilities]
+      properties:
+        driver_code: { type: string, maxLength: 80 }
+        display_name: { type: string, maxLength: 200 }
+        home_node_id: { type: string, format: uuid }
+        mobile: { type: [string, 'null'], maxLength: 32 }
+        capabilities:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [PICKUP, LINEHAUL, DELIVERY] }
+    OperationalProfileInput:
+      description: Atomically create/link a Driver or create/link a Node and assign its role. Operational identity is independent of roles. All owning-module permissions and scope rules apply.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, mode, driver]
+          properties:
+            kind: { type: string, const: DRIVER }
+            mode: { type: string, const: CREATE }
+            driver: { $ref: '#/components/schemas/OnboardingDriver' }
+        - type: object
+          additionalProperties: false
+          required: [kind, mode, existing_id, expected_version]
+          properties:
+            kind: { type: string, const: DRIVER }
+            mode: { type: string, const: LINK }
+            existing_id: { type: string, format: uuid }
+            expected_version: { type: integer, minimum: 1 }
+        - type: object
+          additionalProperties: false
+          required: [kind, mode, role_id, node]
+          properties:
+            kind: { type: string, const: NODE }
+            mode: { type: string, const: CREATE }
+            role_id: { type: string, format: uuid }
+            node: { $ref: './network.yaml#/components/schemas/CreateNodeRequest' }
+        - type: object
+          additionalProperties: false
+          required: [kind, mode, role_id, existing_id]
+          properties:
+            kind: { type: string, const: NODE }
+            mode: { type: string, const: LINK }
+            role_id: { type: string, format: uuid }
+            existing_id: { type: string, format: uuid }
+    DriverProfileReference:
+      type: [object, 'null']
+      required: [driver_id, driver_code, display_name, home_node_id, status]
+      properties:
+        driver_id: { type: string, format: uuid }
+        driver_code: { type: string }
+        display_name: { type: string }
+        home_node_id: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          minLength: 1
+        client_type:
+          type: string
+          const: BRANCH_PANEL
+          default: BRANCH_PANEL
+        device_id:
+          type: string
+          maxLength: 200
+        device_name:
+          type: string
+          maxLength: 200
+    LogoutAllRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        current_password:
+          type: string
+          format: password
+        step_up_verification_token:
+          type: string
+      oneOf:
+        - required: [current_password]
+        - required: [step_up_verification_token]
+    OtpSendRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, purpose]
+      properties:
+        identifier:
+          type: string
+        purpose:
+          type: string
+          enum: [ACTIVATION, PASSWORD_RESET]
+    OtpVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          minLength: 4
+          maxLength: 12
+    PasswordActivateRequest:
+      type: object
+      additionalProperties: false
+      description: Exactly one activation proof is required; neither-token and both-token payloads are invalid.
+      required: [new_password]
+      properties:
+        verification_token:
+          type: string
+        invitation_token:
+          type: string
+        new_password:
+          type: string
+          format: password
+      oneOf:
+        - required: [verification_token]
+          not:
+            required: [invitation_token]
+        - required: [invitation_token]
+          not:
+            required: [verification_token]
+    PasswordResetRequest:
+      type: object
+      additionalProperties: false
+      required: [verification_token, new_password]
+      properties:
+        verification_token:
+          type: string
+        new_password:
+          type: string
+          format: password
+    PasswordChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+    SelfProfileUpdateRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-003
+      minProperties: 1
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        display_name:
+          type: string
+    AdminUserUpdateRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-004
+      minProperties: 1
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        display_name:
+          type: string
+    InviteUserRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-005
+      required: [channel]
+      properties:
+        channel:
+          type: string
+          enum: [SMS, EMAIL]
+    TemporaryPasswordRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-006
+      required: [temporary_password]
+      properties:
+        temporary_password:
+          type: string
+          format: password
+          description: Caller-supplied TLS-only secret validated against the active password policy; never returned or logged
+    RoleMenuKeys:
+      type: [array, 'null']
+      uniqueItems: true
+      maxItems: 27
+      description: Sidebar visibility preference, never an operation grant. Null means automatic permission-derived navigation; an empty array hides all configurable sidebar leaves. Omitted on create uses null, on update preserves, on clone inherits. Effective context unions active explicit roles; any automatic role yields null. Existing permission and entitlement gates still apply.
+      items:
+        type: string
+        enum: [dashboard, consignments, manifests, users, roles, entitlements, operational-statuses, consignment-number-ranges, service-catalog-overview, service-catalog-service-types, service-catalog-shipping-methods, service-catalog-offerings, service-catalog-options, service-catalog-commitment-schedules, pricing-overview, pricing-tariffs, pricing-zones, pricing-charge-types, pricing-simulator, network-areas, network-nodes, network-coverage, network-routes, fleet-drivers, fleet-vehicles, profile, sessions]
+    RoleCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [role_code, role_title, permission_codes]
+      properties:
+        menu_keys:
+          $ref: '#/components/schemas/RoleMenuKeys'
+        role_code:
+          type: string
+          maxLength: 120
+          pattern: '^[a-z][a-z0-9_.-]+$'
+        role_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 500
+        permission_codes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    RoleCloneRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-007
+      required: [role_code, role_title]
+      properties:
+        menu_keys:
+          $ref: '#/components/schemas/RoleMenuKeys'
+        role_code:
+          type: string
+          maxLength: 120
+          pattern: '^[a-z][a-z0-9_.-]+$'
+        role_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 500
+        permission_codes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    RoleUpdateRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-007
+      description: role_code is immutable. Optional permission_codes replaces grants atomically with metadata; empty array clears grants. Requires tenant-wide management and delegation authority. No manual version field.
+      minProperties: 1
+      properties:
+        menu_keys:
+          $ref: '#/components/schemas/RoleMenuKeys'
+        role_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 500
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        permission_codes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ReplaceRolePermissionsRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-008
+      required: [permission_codes]
+      properties:
+        permission_codes:
+          type: array
+          uniqueItems: true
+          description: An explicitly supplied empty array intentionally clears a custom role's grants subject to authorization, audit, and concurrency controls.
+          items:
+            type: string
+    CreateAssignmentsRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-009
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/AssignmentInput'
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      x-chabok-approval-status: approved-IAM-EXT-006
+      required: [creation_mode, first_name, last_name, assignments]
+      properties:
+        operational_profile: { $ref: '#/components/schemas/OperationalProfileInput' }
+        creation_mode:
+          type: string
+          enum: [DIRECT_ACTIVE, SMS_INVITATION, EMAIL_INVITATION]
+        username:
+          type: string
+        mobile:
+          type: string
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        temporary_password:
+          type: string
+          format: password
+          description: Required only for DIRECT_ACTIVE; validated against policy, never returned/logged, and sets must_change_password=true
+        assignments:
+          type: array
+          minItems: 0
+          maxItems: 50
+          description: At least one assignment must exist after composing any Node profile assignment.
+          items:
+            $ref: '#/components/schemas/AssignmentInput'
+      anyOf:
+        - required: [username]
+        - required: [mobile]
+        - required: [email]
+      oneOf:
+        - properties:
+            creation_mode:
+              const: DIRECT_ACTIVE
+          required: [temporary_password]
+        - properties:
+            creation_mode:
+              const: SMS_INVITATION
+          required: [mobile]
+          not:
+            required: [temporary_password]
+        - properties:
+            creation_mode:
+              const: EMAIL_INVITATION
+          required: [email]
+          not:
+            required: [temporary_password]
+    AssignmentInput:
+      type: object
+      additionalProperties: false
+      required: [role_id, scope_type, includes_descendants]
+      properties:
+        role_id:
+          type: string
+          format: uuid
+        scope_type:
+          $ref: '#/components/schemas/ScopeType'
+        scope_id:
+          type: [string, 'null']
+          format: uuid
+        includes_descendants:
+          type: boolean
+    UserStatus:
+      type: string
+      enum: [INVITED, ACTIVE, SUSPENDED, DEACTIVATED]
+    ScopeType:
+      type: string
+      enum: [PLATFORM, TENANT, AREA, NODE, VENDOR, VENDOR_BRANCH, SELF]
+    User:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, status, must_change_password]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        hq_id:
+          type: [string, 'null']
+          format: uuid
+        username:
+          type: [string, 'null']
+        mobile:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        display_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        must_change_password:
+          type: boolean
+    Scope:
+      type: object
+      required: [scope_type, includes_descendants]
+      properties:
+        scope_type:
+          $ref: '#/components/schemas/ScopeType'
+        scope_id:
+          type: [string, 'null']
+          format: uuid
+        includes_descendants:
+          type: boolean
+    Context:
+      type: object
+      additionalProperties: false
+      required:
+        - hq_id
+        - is_platform_admin
+        - role_codes
+        - permissions
+        - scopes
+        - accessible_node_ids
+        - module_entitlements
+        - default_node_id
+      properties:
+        permission_scopes:
+          type: object
+          description: Active role grants bound to their original scopes. Disabled module grants remain here for delegation checks; operations must also enforce the effective permissions and entitlement list.
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/Scope' }
+        menu_keys:
+          $ref: '#/components/schemas/RoleMenuKeys'
+        hq_id:
+          type: [string, 'null']
+          format: uuid
+        tenant:
+          oneOf:
+            - $ref: '#/components/schemas/TenantReference'
+            - type: 'null'
+        is_platform_admin:
+          type: boolean
+        role_codes:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scope'
+        accessible_node_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        module_entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entitlement'
+        default_node_id:
+          type: [string, 'null']
+          format: uuid
+    TenantReference:
+      type: object
+      additionalProperties: false
+      required: [hq_id, code, title]
+      properties:
+        hq_id: { type: string, format: uuid }
+        code: { type: string }
+        title: { type: string }
+    Session:
+      type: object
+      required: [session_id, issued_at, expires_at, revoked]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        device_id:
+          type: [string, 'null']
+        device_name:
+          type: [string, 'null']
+        issued_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        revoked:
+          type: boolean
+    Node:
+      type: object
+      required: [node_id, node_code, node_title, node_type, status]
+      properties:
+        node_id:
+          type: string
+          format: uuid
+        node_code:
+          type: string
+        node_title:
+          type: string
+        node_type:
+          type: string
+        status:
+          type: string
+    Role:
+      type: object
+      required: [role_id, role_code, role_title, role_kind, status, permission_codes]
+      properties:
+        menu_keys:
+          $ref: '#/components/schemas/RoleMenuKeys'
+        role_id:
+          type: string
+          format: uuid
+        hq_id:
+          type: [string, 'null']
+          format: uuid
+        role_code:
+          type: string
+        role_title:
+          type: string
+        description:
+          type: [string, 'null']
+        role_kind:
+          type: string
+          enum: [SYSTEM, TEMPLATE, CUSTOM]
+        is_cloneable:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        permission_codes:
+          type: array
+          items:
+            type: string
+    Permission:
+      type: object
+      required: [permission_id, permission_code, module_code, description, status]
+      properties:
+        permission_id:
+          type: string
+          format: uuid
+        permission_code:
+          type: string
+        module_code:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        can_grant:
+          type: boolean
+          description: Whether the caller can grant this permission to a tenant custom role. Revalidated on every mutation.
+    Assignment:
+      type: object
+      required: [assignment_id, user_id, role_id, scope_type, includes_descendants, status]
+      properties:
+        scope_title: { type: string, description: Human-readable scope name }
+        assignment_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        role_id:
+          type: string
+          format: uuid
+        scope_type:
+          $ref: '#/components/schemas/ScopeType'
+        scope_id:
+          type: [string, 'null']
+          format: uuid
+        includes_descendants:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED]
+    Entitlement:
+      type: object
+      required: [module_code, status]
+      properties:
+        module_code:
+          type: string
+        status:
+          type: string
+          enum: [ENABLED, SUSPENDED, DISABLED]
+    PaginationMeta:
+      type: object
+      required: [page, page_size, total, total_pages]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, field_errors, details, correlation_id]
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        details:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    SuccessFlagEnvelope:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: object
+          required: [success]
+          properties:
+            success:
+              type: boolean
+        meta:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    LoginSuccess:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: object
+          required: [access_token, expires_in, session_id, must_change_password, user, context]
+          properties:
+            access_token:
+              type: string
+            expires_in:
+              type: integer
+            session_id:
+              type: string
+              format: uuid
+            must_change_password:
+              type: boolean
+            user:
+              $ref: '#/components/schemas/User'
+            context:
+              $ref: '#/components/schemas/Context'
+        meta:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    AccessTokenSuccess:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: object
+          required: [access_token, expires_in]
+          properties:
+            access_token:
+              type: string
+            expires_in:
+              type: integer
+        meta:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    UserSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/User'
+    UserDetailSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [user, assignments, sessions]
+              properties:
+                driver_profile: { $ref: '#/components/schemas/DriverProfileReference' }
+                user:
+                  $ref: '#/components/schemas/User'
+                assignments:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Assignment'
+                invitation_status:
+                  type: [string, 'null']
+                sessions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Session'
+    UserStatusSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [user_id, status]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                status:
+                  $ref: '#/components/schemas/UserStatus'
+    ContextSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Context'
+    SessionListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Session'
+    NodeListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Node'
+    UserListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+    RoleSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Role'
+    RoleListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Role'
+    PermissionListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Permission'
+    AssignmentListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Assignment'
+    EntitlementListSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Entitlement'
+    RevokedCountSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [revoked_session_count]
+              properties:
+                revoked_session_count:
+                  type: integer
+                  minimum: 0
+    OtpChallengeSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [challenge_id, expires_in]
+              properties:
+                challenge_id:
+                  type: string
+                  format: uuid
+                expires_in:
+                  type: integer
+    VerificationTokenSuccess:
+      allOf:
+        - $ref: '#/components/schemas/DataEnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [verification_token, expires_in]
+              properties:
+                verification_token:
+                  type: string
+                expires_in:
+                  type: integer
+    DataEnvelopeBase:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data: {}
+        meta:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+    PaginatedEnvelopeBase:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: array
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+        correlation_id:
+          type: string
+          format: uuid

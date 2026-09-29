@@ -1,0 +1,41 @@
+extends:
+  - recommended
+
+apis:
+  iam@v1:
+    root: v1/iam.yaml
+  consignments@v1:
+    root: v1/consignments.yaml
+  manifests@v1:
+    root: v1/manifests.yaml
+  dashboard@v1:
+    root: v1/dashboard.yaml
+  service-catalog@v1:
+    root: v1/service-catalog.yaml
+    # Laravel constrains {resource} to service-types, shipping-methods,
+    # offerings, and options. Redocly cannot infer those route constraints
+    # and otherwise reports the static commitment-schedules routes as
+    # ambiguous with the constrained resource routes.
+    rules:
+      no-ambiguous-paths: off
+  pricing@v1:
+    root: v1/pricing.yaml
+  geography@v1:
+    root: v1/geography.yaml
+  operations@v1:
+    root: v1/operations.yaml
+  network@v1:
+    root: v1/network.yaml
+  fleet@v1:
+    root: v1/fleet.yaml
+
+rules:
+  no-server-example.com: error
+  no-unresolved-refs: error
+  operation-operationId-unique: error
+  operation-operationId: error
+  security-defined: error
+  info-license: off
+  tag-description: off
+  no-required-schema-properties-undefined: off
+  operation-4xx-response: off

@@ -1,0 +1,176 @@
+openapi: 3.1.0
+info:
+  title: Chabok Fleet Administration API
+  version: 1.0.0
+  description: >-
+    Current-HQ Driver and Vehicle administration. This is the Wave 1 public
+    contract baseline; operations are not implemented by the foundation commit.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Fleet Drivers
+  - name: Fleet Vehicles
+paths:
+  /fleet/drivers:
+    get:
+      tags: [Fleet Drivers]
+      operationId: listFleetDrivers
+      summary: List current-HQ Drivers
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.driver.view
+      parameters: [{ $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/Status' }, { $ref: '#/components/parameters/Availability' }, { name: home_node_id, in: query, schema: { type: string, format: uuid } }, { name: unlinked, in: query, description: Only drivers without a linked user account., schema: { type: boolean } }, { name: capability, in: query, schema: { $ref: '#/components/schemas/DriverCapability' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/DriverList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Fleet Drivers]
+      operationId: createFleetDriver
+      summary: Create a Driver
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.driver.manage
+      parameters: [{ $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateDriverRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/DriverDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /fleet/drivers/{driver_id}:
+    get:
+      tags: [Fleet Drivers]
+      operationId: getFleetDriver
+      summary: Get a Driver
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.driver.view
+      parameters: [{ $ref: '#/components/parameters/DriverId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/DriverDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Fleet Drivers]
+      operationId: updateFleetDriver
+      summary: Update a Driver with optimistic concurrency
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.driver.manage
+      parameters: [{ $ref: '#/components/parameters/DriverId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateDriverRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/DriverDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /fleet/vehicles:
+    get:
+      tags: [Fleet Vehicles]
+      operationId: listFleetVehicles
+      summary: List current-HQ Vehicles
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.vehicle.view
+      parameters: [{ $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/Status' }, { $ref: '#/components/parameters/Availability' }, { name: home_node_id, in: query, schema: { type: string, format: uuid } }, { name: vehicle_type, in: query, schema: { $ref: '#/components/schemas/VehicleType' } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/VehicleList' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    post:
+      tags: [Fleet Vehicles]
+      operationId: createFleetVehicle
+      summary: Create a Vehicle
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.vehicle.manage
+      parameters: [{ $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateVehicleRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/VehicleDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /fleet/vehicles/{vehicle_id}:
+    get:
+      tags: [Fleet Vehicles]
+      operationId: getFleetVehicle
+      summary: Get a Vehicle
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.vehicle.view
+      parameters: [{ $ref: '#/components/parameters/VehicleId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/VehicleDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Fleet Vehicles]
+      operationId: updateFleetVehicle
+      summary: Update a Vehicle with optimistic concurrency
+      x-chabok-entitlement: Driver
+      x-chabok-permission: fleet.vehicle.manage
+      parameters: [{ $ref: '#/components/parameters/VehicleId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateVehicleRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/VehicleDetail' }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    CorrelationId: { name: X-Correlation-ID, in: header, required: false, schema: { type: string, format: uuid } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 255 } }
+    Search: { name: search, in: query, schema: { type: string, maxLength: 200 } }
+    Status: { name: status, in: query, schema: { $ref: '#/components/schemas/ResourceStatus' } }
+    Availability: { name: availability_status, in: query, schema: { $ref: '#/components/schemas/AvailabilityStatus' } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PerPage: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    DriverId: { name: driver_id, in: path, required: true, schema: { type: string, format: uuid } }
+    VehicleId: { name: vehicle_id, in: path, required: true, schema: { type: string, format: uuid } }
+  schemas:
+    ResourceStatus: { type: string, enum: [ACTIVE, INACTIVE] }
+    AvailabilityStatus: { type: string, enum: [AVAILABLE, ON_MISSION, TEMPORARILY_INACTIVE, MAINTENANCE, INACTIVE] }
+    DriverCapability: { type: string, enum: [PICKUP, LINEHAUL, DELIVERY] }
+    VehicleType: { type: string, enum: [MOTORCYCLE, CAR, VAN, LIGHT_TRUCK, TRUCK, TRAILER, OTHER] }
+    Driver:
+      type: object
+      additionalProperties: false
+      required: [driver_id, driver_code, display_name, user_id, home_node_id, mobile, capabilities, status, availability_status, version]
+      properties:
+        driver_id: { type: string, format: uuid }
+        driver_code: { type: string, maxLength: 80 }
+        display_name: { type: string, maxLength: 200 }
+        user_id: { type: [string, 'null'], format: uuid }
+        home_node_id: { type: string, format: uuid }
+        mobile: { type: [string, 'null'], maxLength: 32 }
+        capabilities: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/DriverCapability' } }
+        status: { $ref: '#/components/schemas/ResourceStatus' }
+        availability_status: { $ref: '#/components/schemas/AvailabilityStatus' }
+        version: { type: integer, minimum: 1 }
+    CreateDriverRequest:
+      type: object
+      additionalProperties: false
+      required: [driver_code, display_name, home_node_id, capabilities]
+      properties: { driver_code: { type: string, maxLength: 80 }, display_name: { type: string, maxLength: 200 }, user_id: { type: [string, 'null'], format: uuid }, home_node_id: { type: string, format: uuid }, mobile: { type: [string, 'null'], maxLength: 32 }, capabilities: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/DriverCapability' } } }
+    UpdateDriverRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties: { display_name: { type: string, maxLength: 200 }, user_id: { type: [string, 'null'], format: uuid }, home_node_id: { type: string, format: uuid }, mobile: { type: [string, 'null'], maxLength: 32 }, capabilities: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/DriverCapability' } }, status: { $ref: '#/components/schemas/ResourceStatus' }, availability_status: { $ref: '#/components/schemas/AvailabilityStatus' }, expected_version: { type: integer, minimum: 1 } }
+    Vehicle:
+      type: object
+      additionalProperties: false
+      required: [vehicle_id, vehicle_code, plate_number, vehicle_type, home_node_id, capacity_weight_grams, capacity_volume_cm3, status, availability_status, version]
+      properties:
+        vehicle_id: { type: string, format: uuid }
+        vehicle_code: { type: string, maxLength: 80 }
+        plate_number: { type: string, maxLength: 40 }
+        vehicle_type: { $ref: '#/components/schemas/VehicleType' }
+        home_node_id: { type: string, format: uuid }
+        capacity_weight_grams: { type: [integer, 'null'], minimum: 1 }
+        capacity_volume_cm3: { type: [integer, 'null'], minimum: 1 }
+        status: { $ref: '#/components/schemas/ResourceStatus' }
+        availability_status: { $ref: '#/components/schemas/AvailabilityStatus' }
+        version: { type: integer, minimum: 1 }
+    CreateVehicleRequest:
+      type: object
+      additionalProperties: false
+      required: [vehicle_code, plate_number, vehicle_type, home_node_id]
+      properties: { vehicle_code: { type: string, maxLength: 80 }, plate_number: { type: string, maxLength: 40 }, vehicle_type: { $ref: '#/components/schemas/VehicleType' }, home_node_id: { type: string, format: uuid }, capacity_weight_grams: { type: [integer, 'null'], minimum: 1 }, capacity_volume_cm3: { type: [integer, 'null'], minimum: 1 } }
+    UpdateVehicleRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties: { plate_number: { type: string, maxLength: 40 }, vehicle_type: { $ref: '#/components/schemas/VehicleType' }, home_node_id: { type: string, format: uuid }, capacity_weight_grams: { type: [integer, 'null'], minimum: 1 }, capacity_volume_cm3: { type: [integer, 'null'], minimum: 1 }, status: { $ref: '#/components/schemas/ResourceStatus' }, availability_status: { $ref: '#/components/schemas/AvailabilityStatus' }, expected_version: { type: integer, minimum: 1 } }
+    Pagination: { type: object, additionalProperties: false, required: [page, page_size, total, total_pages], properties: { page: { type: integer }, page_size: { type: integer }, total: { type: integer }, total_pages: { type: integer } } }
+    ListMeta: { type: object, additionalProperties: false, required: [pagination], properties: { pagination: { $ref: '#/components/schemas/Pagination' } } }
+    DetailMeta: { type: object, additionalProperties: false }
+    DriverListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/Driver' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    DriverEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/Driver' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    VehicleListEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { type: array, items: { $ref: '#/components/schemas/Vehicle' } }, meta: { $ref: '#/components/schemas/ListMeta' }, correlation_id: { type: string, format: uuid } } }
+    VehicleEnvelope: { type: object, additionalProperties: false, required: [data, meta, correlation_id], properties: { data: { $ref: '#/components/schemas/Vehicle' }, meta: { $ref: '#/components/schemas/DetailMeta' }, correlation_id: { type: string, format: uuid } } }
+    ErrorCode: { type: string, enum: [VALIDATION_ERROR, AUTHENTICATION_REQUIRED, FORBIDDEN, TENANT_ACCESS_DENIED, ENTITLEMENT_DISABLED, PERMISSION_DENIED, SCOPE_ACCESS_DENIED, RESOURCE_NOT_FOUND, VERSION_CONFLICT, IDEMPOTENCY_KEY_REUSED, INTERNAL_SERVER_ERROR] }
+    ErrorEnvelope: { type: object, additionalProperties: false, required: [error_code, message, field_errors, details, correlation_id], properties: { error_code: { $ref: '#/components/schemas/ErrorCode' }, message: { type: string }, field_errors: { type: object, additionalProperties: { type: array, items: { type: string } } }, details: { type: object, additionalProperties: true }, correlation_id: { type: string, format: uuid } } }
+  responses:
+    DriverList: { description: Current-HQ Drivers., content: { application/json: { schema: { $ref: '#/components/schemas/DriverListEnvelope' } } } }
+    DriverDetail: { description: Current-HQ Driver., content: { application/json: { schema: { $ref: '#/components/schemas/DriverEnvelope' } } } }
+    VehicleList: { description: Current-HQ Vehicles., content: { application/json: { schema: { $ref: '#/components/schemas/VehicleListEnvelope' } } } }
+    VehicleDetail: { description: Current-HQ Vehicle., content: { application/json: { schema: { $ref: '#/components/schemas/VehicleEnvelope' } } } }
+    Unauthenticated: { description: Authentication is required., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Forbidden: { description: 'Tenant, entitlement, permission, or scope denied.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    NotFound: { description: Resource is absent or not visible., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Conflict: { description: 'Version, identifier, or idempotency conflict.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Unprocessable: { description: 'Validation, lifecycle, or domain-policy rejection.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }

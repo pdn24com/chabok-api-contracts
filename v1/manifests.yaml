@@ -1,0 +1,1770 @@
+openapi: 3.1.0
+info:
+  title: Chabok Manifest API
+  version: 1.1.0
+  description: |
+    Authoritative Manifest-centric operations contract. A Manifest is the only
+    Branch Panel command workflow for operational status transitions, represents
+    exactly one target transition, and never depends on Transport Run. Operators
+    select display-ready server-authorized context resources; they never type or
+    paste UUIDs. Task C implements this contract and Task E must close every
+    temporary contract/implementation gap.
+  x-chabok-decision: ADR-020
+  x-chabok-lifecycle-actions:
+    DRAFT: [EDIT, INSERT, VALIDATE]
+    OPEN_ORDINARY: [EDIT, INSERT, VALIDATE, CONFIRM]
+    OPEN_EXCEPTION_PENDING: [REVIEW_APPROVE, REVIEW_REJECT]
+    OPEN_EXCEPTION_REJECTED: [EDIT, INSERT, VALIDATE, RESUBMIT]
+    CLOSED: []
+  x-chabok-version-behavior:
+    stale_manifest: 409 MANIFEST_VERSION_CONFLICT
+    stale_exception: 409 EXCEPTION_VERSION_CONFLICT
+    idempotent_replay: same Idempotency-Key and same normalized command returns the original material response
+  x-chabok-zero-success:
+    manifest_state: OPEN
+    error_code: MANIFEST_NO_SUCCESSFUL_PARCELS
+    forbidden_effects: [STATUS, CUSTODY, ROUTE_PLAN, ROUTE_LEG, DRIVER, VEHICLE, EXCEPTION_APPROVAL, MANIFEST_CLOSE, MANIFEST_CLOSED_EVENT]
+  x-chabok-transition-contract:
+    - target_status: PD
+      allowed_source_statuses: [CFM]
+      operational_context_types: [PICKUP_ASSIGNMENT]
+      current_node_requirement: PARCEL_AT_CURRENT_NODE
+      origin_node_derivation: CURRENT_NODE
+      destination_node_derivation: NONE
+      route_plan_requirement: FORBIDDEN
+      route_leg_requirement: FORBIDDEN
+      driver_capability: PICKUP
+      driver_requirement: REQUIRED
+      vehicle_requirement: FORBIDDEN
+      expected_custody_types: [NODE]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, DRIVER_ASSIGNMENT, AUDIT, OUTBOX]
+    - target_status: PU
+      allowed_source_statuses: [PD]
+      operational_context_types: [PICKUP_COMPLETION]
+      current_node_requirement: ASSIGNMENT_NODE
+      origin_node_derivation: PRECEDING_PD_ASSIGNMENT
+      destination_node_derivation: CURRENT_NODE
+      route_plan_requirement: FORBIDDEN
+      route_leg_requirement: FORBIDDEN
+      driver_capability: PICKUP
+      driver_requirement: DERIVED
+      vehicle_requirement: FORBIDDEN
+      expected_custody_types: [PICKUP_DRIVER]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, DRIVER_ASSIGNMENT, AUDIT, OUTBOX]
+    - target_status: NPU
+      allowed_source_statuses: [PD]
+      operational_context_types: [PICKUP_EXCEPTION]
+      current_node_requirement: ASSIGNMENT_NODE
+      origin_node_derivation: PRECEDING_PD_ASSIGNMENT
+      destination_node_derivation: NONE
+      route_plan_requirement: FORBIDDEN
+      route_leg_requirement: FORBIDDEN
+      driver_capability: PICKUP
+      driver_requirement: DERIVED
+      vehicle_requirement: FORBIDDEN
+      expected_custody_types: [PICKUP_DRIVER]
+      exception_review: REQUIRED
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, DRIVER_ASSIGNMENT, EXCEPTION_HISTORY, AUDIT, OUTBOX]
+    - target_status: IR
+      allowed_source_statuses: [PU, OS]
+      operational_context_types: [PICKUP_RECEPTION, MOVEMENT_RECEPTION]
+      current_node_requirement: DESTINATION_NODE
+      origin_node_derivation: PREVIOUS_CUSTODY_OR_ROUTE_LEG
+      destination_node_derivation: CURRENT_NODE
+      route_plan_requirement: SOURCE_DEPENDENT
+      route_leg_requirement: REQUIRED_FOR_OS_ONLY
+      driver_capability: null
+      driver_requirement: DERIVED_FOR_OS
+      vehicle_requirement: DERIVED_FOR_OS
+      expected_custody_types: [PICKUP_DRIVER, LINEHAUL_DRIVER]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, ROUTE_PLAN, ROUTE_LEG, DRIVER_ASSIGNMENT, VEHICLE_ASSIGNMENT, AUDIT, OUTBOX]
+    - target_status: ROU
+      allowed_source_statuses: [IR]
+      operational_context_types: [ROUTE_REGISTRATION]
+      current_node_requirement: ROUTE_LEG_ORIGIN
+      origin_node_derivation: CURRENT_NODE
+      destination_node_derivation: NEXT_ROUTE_LEG_DESTINATION
+      route_plan_requirement: REQUIRED_RESOLVED_OR_SNAPSHOTTED
+      route_leg_requirement: REQUIRED_NEXT_LEG
+      driver_capability: null
+      driver_requirement: FORBIDDEN
+      vehicle_requirement: FORBIDDEN
+      expected_custody_types: [NODE]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, ROUTE_PLAN, ROUTE_LEG, AUDIT, OUTBOX]
+    - target_status: OF
+      allowed_source_statuses: [ROU]
+      operational_context_types: [OUTBOUND_CONFIRMATION]
+      current_node_requirement: ROUTE_LEG_ORIGIN
+      origin_node_derivation: ROUTE_LEG_ORIGIN
+      destination_node_derivation: ROUTE_LEG_DESTINATION
+      route_plan_requirement: REQUIRED
+      route_leg_requirement: REQUIRED_ROUTED
+      driver_capability: null
+      driver_requirement: FORBIDDEN
+      vehicle_requirement: FORBIDDEN
+      expected_custody_types: [NODE]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, ROUTE_PLAN, ROUTE_LEG, AUDIT, OUTBOX]
+    - target_status: OS
+      allowed_source_statuses: [OF]
+      operational_context_types: [LINEHAUL_DEPARTURE]
+      current_node_requirement: ROUTE_LEG_ORIGIN
+      origin_node_derivation: ROUTE_LEG_ORIGIN
+      destination_node_derivation: ROUTE_LEG_DESTINATION
+      route_plan_requirement: REQUIRED
+      route_leg_requirement: REQUIRED_OUTBOUND_CONFIRMED
+      driver_capability: LINEHAUL
+      driver_requirement: REQUIRED
+      vehicle_requirement: REQUIRED_ACTIVE_AVAILABLE
+      expected_custody_types: [NODE]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, ROUTE_PLAN, ROUTE_LEG, DRIVER_ASSIGNMENT, VEHICLE_ASSIGNMENT, AUDIT, OUTBOX]
+    - target_status: OD
+      allowed_source_statuses: [IR]
+      operational_context_types: [DELIVERY_ASSIGNMENT]
+      current_node_requirement: RESOLVED_LAST_MILE_NODE
+      origin_node_derivation: CURRENT_NODE
+      destination_node_derivation: CONSIGNMENT_DESTINATION
+      route_plan_requirement: REQUIRED_LAST_MILE
+      route_leg_requirement: REQUIRED_RECEIVED_OR_FINAL
+      driver_capability: DELIVERY
+      driver_requirement: REQUIRED
+      vehicle_requirement: OPTIONAL
+      expected_custody_types: [NODE]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, ROUTE_PLAN, ROUTE_LEG, DRIVER_ASSIGNMENT, COVERAGE_RESOLUTION, AUDIT, OUTBOX]
+    - target_status: OK
+      allowed_source_statuses: [OD]
+      operational_context_types: [DELIVERY_COMPLETION]
+      current_node_requirement: DELIVERY_ASSIGNMENT_SCOPE
+      origin_node_derivation: PRECEDING_OD_ASSIGNMENT
+      destination_node_derivation: CONSIGNMENT_DESTINATION
+      route_plan_requirement: DERIVED
+      route_leg_requirement: DERIVED
+      driver_capability: DELIVERY
+      driver_requirement: DERIVED
+      vehicle_requirement: DERIVED_OR_NONE
+      expected_custody_types: [DELIVERY_DRIVER]
+      exception_review: NONE
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, DRIVER_ASSIGNMENT, AUDIT, OUTBOX]
+    - target_status: NOK
+      allowed_source_statuses: [OD]
+      operational_context_types: [DELIVERY_EXCEPTION]
+      current_node_requirement: DELIVERY_ASSIGNMENT_SCOPE
+      origin_node_derivation: PRECEDING_OD_ASSIGNMENT
+      destination_node_derivation: CONSIGNMENT_DESTINATION
+      route_plan_requirement: DERIVED
+      route_leg_requirement: DERIVED
+      driver_capability: DELIVERY
+      driver_requirement: DERIVED
+      vehicle_requirement: DERIVED_OR_NONE
+      expected_custody_types: [DELIVERY_DRIVER]
+      exception_review: REQUIRED
+      immutable_evidence: [AUTHENTICATED_ACTOR, SERVER_TIMESTAMP, MANIFEST, MANIFEST_PARCELS, STATUS_HISTORY, CUSTODY_HISTORY, DRIVER_ASSIGNMENT, EXCEPTION_HISTORY, AUDIT, OUTBOX]
+servers:
+  - url: /api/v1
+tags:
+  - name: Manifests
+    description: Tenant- and node-scoped Manifest operations.
+security:
+  - bearerAuth: []
+paths:
+  /manifests:
+    get:
+      tags: [Manifests]
+      operationId: listManifests
+      summary: List visible Manifests
+      x-chabok-permissions: [manifest.view]
+      x-chabok-source: BP-MNF-001, UF-018, ERS v1.7 E04
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/State'
+        - $ref: '#/components/parameters/TargetStatus'
+      responses:
+        '200':
+          description: Tenant- and node-filtered page.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestListSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Manifests]
+      operationId: createManifest
+      summary: Create an idempotent Manifest draft
+      x-chabok-permissions: [manifest.create]
+      x-chabok-source: BP-MNF-002, UF-003, ERS v1.7 E04
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManifestRequest'
+      responses:
+        '201':
+          description: Draft created.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/context-options:
+    get:
+      tags: [Manifests]
+      operationId: listManifestContextOptions
+      summary: List real operational contexts and assignment resources
+      x-chabok-permissions: [manifest.view]
+      x-chabok-conditional-permissions: Driver selectors require driver.view
+      description: |
+        Returns only current-HQ, current-node operational contexts that Manifest
+        is allowed to consume. Operators select labels; authoritative identifiers
+        are submitted from the selected option and revalidated by the server.
+        The response also describes the immutable transition requirements for
+        every approved target status and contains no Transport Run resource.
+      x-chabok-source: ADR-016, ADR-018, ADR-019, ADR-020
+      x-chabok-approval-status: product-owner-approved
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Current operational Node, contexts, Drivers, and Vehicles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestContextOptionsSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /manifests/{manifest_id}:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    get:
+      tags: [Manifests]
+      operationId: getManifest
+      summary: Read Manifest detail and validation buckets
+      x-chabok-permissions: [manifest.view]
+      x-chabok-source: BP-MNF-001, UF-018, ERS v1.7 E04/E05
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Visible Manifest detail.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Manifests]
+      operationId: updateManifestContext
+      summary: Update Draft/Open Manifest context
+      x-chabok-permissions: [manifest.edit]
+      x-chabok-source: BP-MNF-002, UF-019, approved Edit Context modal
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateManifestRequest'
+      responses:
+        '200':
+          description: Context updated and version incremented.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/{manifest_id}/eligible-parcels:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    get:
+      tags: [Manifests]
+      operationId: listManifestEligibleParcels
+      summary: List awaiting Parcels eligible for this Manifest
+      x-chabok-permissions: [manifest.view]
+      x-chabok-source: BP-MNF-004, UF-004, approved Command Station
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Eligible visible Parcels not already active in the Manifest.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibleParcelListSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /manifests/{manifest_id}/parcels:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    post:
+      tags: [Manifests]
+      operationId: addManifestParcels
+      summary: Insert existing Parcels by Parcel or Consignment number
+      x-chabok-permissions: [manifest.edit]
+      x-chabok-source: BP-MNF-003, UF-003, ERS v1.7 E05
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddManifestParcelsRequest'
+      responses:
+        '200':
+          description: Per-input insertion outcomes and current Manifest.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/{manifest_id}/validate:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    post:
+      tags: [Manifests]
+      operationId: validateManifest
+      summary: Revalidate all rows without changing Parcel status
+      x-chabok-permissions: [manifest.edit]
+      x-chabok-source: BP-MNF-005, UF-003, implementation baseline section 7.1
+      x-chabok-approval-status: approved-current-slice
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpectedVersionRequest'
+      responses:
+        '200':
+          description: Validation buckets updated; Parcels unchanged.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/{manifest_id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    post:
+      tags: [Manifests]
+      operationId: confirmManifest
+      summary: Confirm one transition or submit NPU/NOK for Exception Review
+      x-chabok-permissions: [manifest.approve]
+      x-chabok-conditional-permissions: PD, OD, and OS assignment commit also require driver.assign
+      description: |
+        Ordinary targets apply successful rows and close when at least one row
+        succeeds. NPU/NOK create a PENDING Exception, preserve PD/OD, and keep
+        the Manifest OPEN. Zero success keeps the Manifest OPEN and causes no
+        status, custody, route, fleet, task, Exception approval, or closed-event
+        mutation. Recipient/proof/signature/photo/OTP/note are not accepted for OK.
+      x-chabok-source: BP-MNF-006, UF-005, implementation baseline section 7.1, ADR-020
+      x-chabok-approval-status: product-owner-approved
+      x-chabok-audit-outbox: ordinary confirmation closes atomically; exception submission records submission only; zero success writes no close event
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmManifestRequest'
+      responses:
+        '200':
+          description: Ordinary transition applied and Manifest closed.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '202':
+          description: NPU/NOK Exception submitted as PENDING; Manifest remains OPEN.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/{manifest_id}/exception:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    get:
+      tags: [Manifests]
+      operationId: getManifestException
+      summary: Read the current and prior NPU/NOK Exception review state
+      description: |
+        Returns display-ready submitter/reviewer identities, current expected
+        versions, the active/latest case, and immutable prior decision history.
+      x-chabok-source: ADR-020, UF-006, UF-007
+      x-chabok-approval-status: product-owner-approved
+      x-chabok-permissions: [manifest.view]
+      x-chabok-implementation-status: task-c-pending
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+      responses:
+        '200':
+          description: Visible Manifest Exception state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestExceptionSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /manifests/{manifest_id}/exception/approve:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    post:
+      tags: [Manifests]
+      operationId: approveManifestException
+      summary: Approve a pending NPU/NOK Exception and close the Manifest
+      description: |
+        Requires a reviewer different from the submitter. Revalidates Manifest,
+        Exception, Parcel status/custody, scope, and eligibility, then applies
+        PD to NPU or OD to NOK and writes all histories, Audit, and Outbox in one
+        idempotent transaction.
+      x-chabok-source: ADR-020, UF-006, UF-007
+      x-chabok-approval-status: product-owner-approved
+      x-chabok-permissions: [manifest.approve, live_operations.intervene]
+      x-chabok-implementation-status: task-c-pending
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveManifestExceptionRequest'
+      responses:
+        '200':
+          description: Exception approved, successful rows applied, Manifest closed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/{manifest_id}/exception/reject:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    post:
+      tags: [Manifests]
+      operationId: rejectManifestException
+      summary: Reject a pending NPU/NOK Exception without changing Parcel status
+      description: |
+        Records immutable reviewer/reason evidence, preserves PD/OD, keeps the
+        Manifest OPEN, and emits no manifest.closed event.
+      x-chabok-source: ADR-020, UF-006, UF-007
+      x-chabok-approval-status: product-owner-approved
+      x-chabok-permissions: [manifest.approve, live_operations.intervene]
+      x-chabok-implementation-status: task-c-pending
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectManifestExceptionRequest'
+      responses:
+        '200':
+          description: Exception rejected and Manifest remains OPEN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /manifests/{manifest_id}/exception/resubmit:
+    parameters:
+      - $ref: '#/components/parameters/ManifestId'
+    post:
+      tags: [Manifests]
+      operationId: resubmitManifestException
+      summary: Resubmit a corrected rejected NPU/NOK Manifest for review
+      description: |
+        Preserves prior rejected decisions, revalidates corrected rows, creates
+        the next PENDING review attempt, and leaves PD/OD and Manifest OPEN.
+      x-chabok-source: ADR-020, UF-006, UF-007
+      x-chabok-approval-status: product-owner-approved
+      x-chabok-permissions: [manifest.edit]
+      x-chabok-implementation-status: task-c-pending
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResubmitManifestExceptionRequest'
+      responses:
+        '202':
+          description: Corrected Exception resubmitted as the next PENDING attempt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManifestDetailSuccess'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    CorrelationId:
+      description: Request correlation identifier.
+      schema:
+        type: string
+        format: uuid
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    NodeId:
+      name: X-Node-Id
+      in: header
+      required: true
+      description: Validated operational context; never a tenant authority.
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    ManifestId:
+      name: manifest_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 250
+        default: 25
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+        maxLength: 160
+    State:
+      name: state
+      in: query
+      description: Comma-separated selections (OR); other filters combine with AND. Legacy scalar accepted; empty means unrestricted. Up to 50 selections.
+      style: form
+      explode: false
+      schema:
+        type: array
+        maxItems: 50
+        items:
+            $ref: '#/components/schemas/ManifestState'
+    TargetStatus:
+      name: manifest_status
+      in: query
+      description: Comma-separated selections (OR); other filters combine with AND. Legacy scalar accepted; empty means unrestricted. Up to 50 selections.
+      style: form
+      explode: false
+      schema:
+        type: array
+        maxItems: 50
+        items:
+            $ref: '#/components/schemas/ManifestTargetStatus'
+  schemas:
+    ManifestState:
+      type: string
+      enum: [DRAFT, OPEN, CLOSED]
+    ManifestTargetStatus:
+      type: string
+      pattern: '^[A-Z][A-Z0-9_]{1,31}$'
+      description: Operational catalogue code; context options determine executable targets.
+    ManifestParcelStatus:
+      type: string
+      enum: [PENDING, VALIDATED, SUCCEEDED, FAILED, SKIPPED]
+    ManifestOperationalContextType:
+      type: string
+      enum:
+        - PICKUP_ASSIGNMENT
+        - PICKUP_COMPLETION
+        - PICKUP_EXCEPTION
+        - PICKUP_RECEPTION
+        - MOVEMENT_RECEPTION
+        - ROUTE_REGISTRATION
+        - OUTBOUND_CONFIRMATION
+        - LINEHAUL_DEPARTURE
+        - TRANSIT_UNLOAD
+        - DELIVERY_ASSIGNMENT
+        - DELIVERY_COMPLETION
+        - DELIVERY_EXCEPTION
+    ManifestType:
+      type: string
+      description: Server-derived transition family retained for compatibility and display.
+      enum:
+        - PICKUP_ASSIGNMENT
+        - PICKUP_COMPLETION
+        - PICKUP_EXCEPTION
+        - INBOUND_RECEPTION
+        - ROUTE_REGISTRATION
+        - OUTBOUND_TRANSFER
+        - LINEHAUL_DEPARTURE
+        - TRANSIT_UNLOAD
+        - DELIVERY_ASSIGNMENT
+        - DELIVERY_COMPLETION
+        - DELIVERY_EXCEPTION
+    LocalizedCopy:
+      type: object
+      additionalProperties: false
+      required: [fa, en]
+      properties:
+        fa: { type: string }
+        en: { type: string }
+    EligibilityPresentation:
+      type: object
+      additionalProperties: false
+      required: [title, detail, suggested_action]
+      properties:
+        title: { $ref: '#/components/schemas/LocalizedCopy' }
+        detail: { $ref: '#/components/schemas/LocalizedCopy' }
+        suggested_action: { $ref: '#/components/schemas/LocalizedCopy' }
+    ParcelEligibility:
+      type: object
+      additionalProperties: false
+      required: [reason_code, eligible, severity, presentation]
+      properties:
+        reason_code:
+          type: string
+          enum:
+            - ELIGIBLE
+            - PARCEL_NOT_FOUND
+            - PARCEL_ALREADY_ASSIGNED
+            - PRICING_STALE
+            - STATUS_NOT_ALLOWED
+            - CURRENT_NODE_MISMATCH
+            - CUSTODY_MISMATCH
+            - PICKUP_TASK_NOT_COMPLETED
+            - PICKUP_ASSIGNMENT_MISMATCH
+            - ROUTE_PLAN_MISMATCH
+            - ROUTE_PLAN_UNAVAILABLE
+            - ROUTE_LEG_MISMATCH
+            - ROUTE_LEG_UNAVAILABLE
+            - ROUTE_LEG_NOT_READY
+            - CONFIG_VERSION_UNAVAILABLE
+            - PREVIOUS_MOVEMENT_MISMATCH
+            - DELIVERY_ROUTE_INCOMPLETE
+            - DELIVERY_NODE_MISMATCH
+            - COVERAGE_NOT_FOUND
+            - COVERAGE_AMBIGUOUS
+            - DRIVER_UNAVAILABLE
+            - DRIVER_INCAPABLE
+            - DRIVER_OUT_OF_SCOPE
+            - VEHICLE_UNAVAILABLE
+            - VEHICLE_INCAPABLE
+            - VEHICLE_OUT_OF_SCOPE
+            - EXCEPTION_REVIEW_REQUIRED
+        eligible: { type: boolean }
+        severity: { type: string, enum: [SUCCESS, ERROR] }
+        presentation: { $ref: '#/components/schemas/EligibilityPresentation' }
+    NodeSummary:
+      type: object
+      additionalProperties: false
+      required: [node_id, node_code, node_title, node_type, status]
+      properties:
+        node_id: { type: string, format: uuid }
+        node_code: { type: string }
+        node_title: { type: string }
+        node_type: { type: string }
+        status: { type: string }
+    DriverSummary:
+      type: object
+      additionalProperties: false
+      required: [driver_id, driver_code, display_name, home_node_id, status, availability_status, capabilities]
+      properties:
+        driver_id: { type: string, format: uuid }
+        driver_code: { type: string }
+        display_name: { type: string }
+        home_node_id: { type: string, format: uuid }
+        status: { type: string }
+        availability_status: { type: string, enum: [AVAILABLE, ON_MISSION] }
+        capabilities:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [PICKUP, LINEHAUL, DELIVERY]
+    VehicleSummary:
+      type: object
+      additionalProperties: false
+      required: [vehicle_id, vehicle_code, registration_number, vehicle_type, home_node_id, status, availability_status, capabilities]
+      properties:
+        vehicle_id: { type: string, format: uuid }
+        vehicle_code: { type: string }
+        registration_number: { type: string }
+        vehicle_type: { type: string }
+        home_node_id: { type: string, format: uuid }
+        status: { type: string }
+        availability_status: { type: string }
+        capabilities:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [LINEHAUL, DELIVERY]
+    RoutePlanSummary:
+      type: object
+      additionalProperties: false
+      required: [route_plan_id, consignment_id, consignment_number, route_definition_id, route_code, route_title, status, version]
+      properties:
+        route_plan_id: { type: string, format: uuid }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { type: string }
+        route_definition_id: { type: string, format: uuid }
+        route_code: { type: string }
+        route_title: { type: string }
+        status: { type: string }
+        version: { type: integer, minimum: 1 }
+    RouteLegSummary:
+      type: object
+      additionalProperties: false
+      required: [route_plan_leg_id, leg_order, status, origin_node_id, destination_node_id]
+      properties:
+        route_plan_leg_id: { type: string, format: uuid }
+        leg_order: { type: integer, minimum: 1 }
+        status: { type: string }
+        origin_node_id: { type: string, format: uuid }
+        destination_node_id: { type: string, format: uuid }
+    ManifestContextSummary:
+      type: object
+      additionalProperties: false
+      required: [operational_context_type, issuing_node, target_node, current_node, related_node, related_node_role, origin_node, destination_node, route_plan, route_leg, driver, vehicle]
+      properties:
+        operational_context_type: { $ref: '#/components/schemas/ManifestOperationalContextType' }
+        issuing_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+          description: Authoritative Node at which the Manifest was created.
+        target_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+          description: Explicit target/destination Node; null only for historical rows without target evidence.
+        current_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        related_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        related_node_role:
+          type: string
+          enum: [SOURCE, DESTINATION, COUNTERPARTY]
+        origin_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        destination_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        route_plan:
+          oneOf: [{ $ref: '#/components/schemas/RoutePlanSummary' }, { type: 'null' }]
+        route_leg:
+          oneOf: [{ $ref: '#/components/schemas/RouteLegSummary' }, { type: 'null' }]
+        driver:
+          oneOf: [{ $ref: '#/components/schemas/DriverSummary' }, { type: 'null' }]
+        vehicle:
+          oneOf: [{ $ref: '#/components/schemas/VehicleSummary' }, { type: 'null' }]
+    CreateManifestRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, manifest_status, context_key]
+      description: |
+        context_key, target_node_id, and any Driver/Vehicle IDs must come from the current
+        server-authorized context-options response. They are never free-text
+        operator inputs. The target Node is explicit; route/custody eligibility is
+        evaluated when Parcels are added, validated, and confirmed.
+        Creation uses expected_version 0 because no Manifest aggregate exists yet.
+      properties:
+        expected_version:
+          type: integer
+          const: 0
+          description: Creation sentinel; fails with 409 if the idempotency key resolves to a conflicting aggregate.
+        manifest_status:
+          $ref: '#/components/schemas/ManifestTargetStatus'
+        context_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        target_node_id:
+          type: string
+          format: uuid
+        assigned_driver_id:
+          type: [string, 'null']
+          format: uuid
+        assigned_vehicle_id: { type: [string, 'null'], format: uuid }
+    UpdateManifestRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        manifest_status:
+          $ref: '#/components/schemas/ManifestTargetStatus'
+        context_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        target_node_id:
+          type: string
+          format: uuid
+        assigned_driver_id:
+          type: [string, 'null']
+          format: uuid
+        assigned_vehicle_id: { type: [string, 'null'], format: uuid }
+    ExpectedVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+    ConfirmManifestRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, acknowledge_partial_success]
+      description: |
+        Contains no OK proof fields. For NPU/NOK, confirmation submits a PENDING
+        Exception and does not apply the target status.
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        acknowledge_partial_success:
+          type: boolean
+          const: true
+        exception_reason_code:
+          type: [string, 'null']
+          maxLength: 80
+          description: Required only for NPU/NOK submission.
+        exception_description:
+          type: [string, 'null']
+          maxLength: 500
+          description: Required only for NPU/NOK submission.
+    AddManifestParcelsRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, input_source, identifiers]
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        input_source:
+          type: string
+          enum: [SCAN, MANUAL, BATCH, AWAITING]
+        identifiers:
+          type: array
+          minItems: 1
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+    ManifestTransitionDefinition:
+      type: object
+      additionalProperties: false
+      required:
+        - target_status
+        - allowed_source_statuses
+        - operational_context_types
+        - current_node_requirement
+        - origin_node_derivation
+        - destination_node_derivation
+        - route_plan_requirement
+        - route_leg_requirement
+        - driver_requirement
+        - vehicle_requirement
+        - expected_custody_types
+        - exception_review_required
+        - immutable_evidence
+      properties:
+        target_status: { $ref: '#/components/schemas/ManifestTargetStatus' }
+        allowed_source_statuses:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: '^[A-Z][A-Z0-9_]{1,31}$'
+        operational_context_types:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/ManifestOperationalContextType' }
+        current_node_requirement: { type: string }
+        origin_node_derivation: { type: string }
+        destination_node_derivation: { type: string }
+        route_plan_requirement: { type: string }
+        route_leg_requirement: { type: string }
+        required_driver_capability:
+          type: [string, 'null']
+          enum: [PICKUP, LINEHAUL, DELIVERY, null]
+        driver_requirement: { type: string, enum: [FORBIDDEN, REQUIRED, DERIVED, DERIVED_FOR_OS] }
+        vehicle_requirement: { type: string, enum: [FORBIDDEN, REQUIRED_ACTIVE_AVAILABLE, OPTIONAL, DERIVED_FOR_OS, DERIVED_OR_NONE] }
+        expected_custody_types:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [NODE, PICKUP_DRIVER, LINEHAUL_DRIVER, DELIVERY_DRIVER]
+        exception_review_required: { type: boolean }
+        immutable_evidence:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - AUTHENTICATED_ACTOR
+              - SERVER_TIMESTAMP
+              - MANIFEST
+              - MANIFEST_PARCELS
+              - STATUS_HISTORY
+              - CUSTODY_HISTORY
+              - ROUTE_PLAN
+              - ROUTE_LEG
+              - DRIVER_ASSIGNMENT
+              - VEHICLE_ASSIGNMENT
+              - COVERAGE_RESOLUTION
+              - EXCEPTION_HISTORY
+              - AUDIT
+              - OUTBOX
+    ManifestContextOption:
+      type: object
+      additionalProperties: false
+      required: [context_key, operational_context_type, manifest_status, label, target_node, related_node, related_node_role, selection]
+      properties:
+        context_key: { type: string }
+        operational_context_type: { $ref: '#/components/schemas/ManifestOperationalContextType' }
+        manifest_status: { $ref: '#/components/schemas/ManifestTargetStatus' }
+        label: { $ref: '#/components/schemas/LocalizedCopy' }
+        target_node: { $ref: '#/components/schemas/NodeSummary' }
+        related_node: { $ref: '#/components/schemas/NodeSummary' }
+        related_node_role:
+          type: string
+          enum: [SOURCE, DESTINATION, COUNTERPARTY]
+        selection: { $ref: '#/components/schemas/CreateManifestRequest' }
+        consignment_number: { type: string }
+        route_code: { type: string }
+        route_leg_order: { type: integer, minimum: 1 }
+    ManifestContextOptions:
+      type: object
+      additionalProperties: false
+      required: [current_node, target_nodes, transition_contracts, contexts, drivers, vehicles]
+      properties:
+        current_node: { $ref: '#/components/schemas/NodeSummary' }
+        target_nodes:
+          type: array
+          description: Active target Nodes in the current tenant and operator scope.
+          items: { $ref: '#/components/schemas/NodeSummary' }
+        transition_contracts:
+          type: array
+          minItems: 11
+          maxItems: 11
+          items: { $ref: '#/components/schemas/ManifestTransitionDefinition' }
+        contexts:
+          type: array
+          items: { $ref: '#/components/schemas/ManifestContextOption' }
+        drivers:
+          type: array
+          items: { $ref: '#/components/schemas/DriverSummary' }
+        vehicles:
+          type: array
+          items: { $ref: '#/components/schemas/VehicleSummary' }
+    ManifestListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - manifest_id
+        - manifest_number
+        - node_id
+        - manifest_status
+        - state
+        - manifest_type
+        - operational_context_type
+        - context_key
+        - origin_node_id
+        - destination_node_id
+        - route_plan_id
+        - route_plan_leg_id
+        - assigned_driver_id
+        - assigned_vehicle_id
+        - version
+        - total_count
+        - succeeded_count
+        - failed_count
+        - created_at
+        - updated_at
+        - issuing_node
+        - target_node
+        - context
+      properties:
+        manifest_id:
+          type: string
+          format: uuid
+        manifest_number:
+          type: string
+        node_id:
+          type: string
+          format: uuid
+        manifest_status:
+          $ref: '#/components/schemas/ManifestTargetStatus'
+        state:
+          $ref: '#/components/schemas/ManifestState'
+        manifest_type:
+          $ref: '#/components/schemas/ManifestType'
+        operational_context_type:
+          $ref: '#/components/schemas/ManifestOperationalContextType'
+        context_key:
+          type: string
+        origin_node_id: { type: [string, 'null'], format: uuid }
+        destination_node_id: { type: [string, 'null'], format: uuid }
+        route_plan_id: { type: [string, 'null'], format: uuid }
+        route_plan_leg_id: { type: [string, 'null'], format: uuid }
+        assigned_driver_id:
+          type: [string, 'null']
+          format: uuid
+        assigned_vehicle_id:
+          type: [string, 'null']
+          format: uuid
+        version:
+          type: integer
+        total_count:
+          type: integer
+        succeeded_count:
+          type: integer
+        failed_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        issuing_node:
+          $ref: '#/components/schemas/NodeSummary'
+          description: Authoritative Node at which the Manifest was created.
+        target_node:
+          description: Explicit target/destination Node. Historical rows without target evidence return null.
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        context:
+          $ref: '#/components/schemas/ManifestContextSummary'
+    ManifestParcel:
+      type: object
+      additionalProperties: false
+      required:
+        - manifest_parcel_id
+        - parcel_id
+        - parcel_number
+        - consignment_id
+        - consignment_number
+        - current_status
+        - manifest_parcel_status
+        - input_source
+        - input_value
+        - created_at
+        - eligibility
+      properties:
+        manifest_parcel_id:
+          type: string
+          format: uuid
+        parcel_id:
+          type: string
+          format: uuid
+        parcel_number:
+          type: string
+        consignment_id:
+          type: string
+          format: uuid
+        consignment_number:
+          type: string
+        receiver_contact_name:
+          type: string
+        current_status:
+          type: string
+        manifest_parcel_status:
+          $ref: '#/components/schemas/ManifestParcelStatus'
+        failure_code:
+          type: [string, 'null']
+        failure_reason:
+          type: [string, 'null']
+        eligibility:
+          $ref: '#/components/schemas/ParcelEligibility'
+        input_source:
+          type: string
+          enum: [SCAN, MANUAL, BATCH, AWAITING]
+        input_value:
+          type: string
+        processed_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    ActorSummary:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name]
+      properties:
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+    ManifestCustodyEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - custody_event_id
+        - consignment_id
+        - consignment_number
+        - parcel_id
+        - parcel_number
+        - from_node
+        - to_node
+        - from_custody_type
+        - to_custody_type
+        - actor
+        - created_at
+      properties:
+        custody_event_id: { type: string, format: uuid }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { type: string }
+        parcel_id: { type: string, format: uuid }
+        parcel_number: { type: string }
+        from_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        to_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        from_custody_type: { type: [string, 'null'] }
+        to_custody_type: { type: string }
+        actor: { $ref: '#/components/schemas/ActorSummary' }
+        created_at: { type: string, format: date-time }
+    ManifestMovementEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - target_status
+        - source_statuses
+        - context_key
+        - operational_context_type
+        - origin_node
+        - destination_node
+        - route_plan
+        - route_leg
+        - driver
+        - vehicle
+        - recorded_by
+        - recorded_at
+      properties:
+        target_status: { $ref: '#/components/schemas/ManifestTargetStatus' }
+        source_statuses:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+        context_key: { type: string }
+        operational_context_type: { $ref: '#/components/schemas/ManifestOperationalContextType' }
+        origin_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        destination_node:
+          oneOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }]
+        route_plan:
+          oneOf: [{ $ref: '#/components/schemas/RoutePlanSummary' }, { type: 'null' }]
+        route_leg:
+          oneOf: [{ $ref: '#/components/schemas/RouteLegSummary' }, { type: 'null' }]
+        driver:
+          oneOf: [{ $ref: '#/components/schemas/DriverSummary' }, { type: 'null' }]
+        vehicle:
+          oneOf: [{ $ref: '#/components/schemas/VehicleSummary' }, { type: 'null' }]
+        recorded_by: { $ref: '#/components/schemas/ActorSummary' }
+        recorded_at: { type: string, format: date-time }
+    ManifestExceptionStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+    ManifestExceptionHistoryEvent:
+      type: object
+      additionalProperties: false
+      required: [action, actor, safe_reason, manifest_version, exception_version, occurred_at]
+      properties:
+        action: { type: string, enum: [SUBMITTED, APPROVED, REJECTED, RESUBMITTED] }
+        actor: { $ref: '#/components/schemas/ActorSummary' }
+        safe_reason: { type: [string, 'null'] }
+        manifest_version: { type: integer, minimum: 1 }
+        exception_version: { type: integer, minimum: 1 }
+        occurred_at: { type: string, format: date-time }
+    ManifestException:
+      type: object
+      additionalProperties: false
+      required:
+        - exception_case_id
+        - manifest_id
+        - exception_type
+        - status
+        - version
+        - submission_sequence
+        - reason_code
+        - description
+        - submitted_by
+        - submitted_at
+        - reviewed_by
+        - reviewed_at
+        - decision_reason
+        - history
+      properties:
+        exception_case_id: { type: string, format: uuid }
+        manifest_id: { type: string, format: uuid }
+        exception_type: { type: string, enum: [NPU, NOK] }
+        status: { $ref: '#/components/schemas/ManifestExceptionStatus' }
+        version: { type: integer, minimum: 1 }
+        submission_sequence: { type: integer, minimum: 1 }
+        reason_code: { type: string, maxLength: 80 }
+        description: { type: string, maxLength: 500 }
+        submitted_by: { $ref: '#/components/schemas/ActorSummary' }
+        submitted_at: { type: string, format: date-time }
+        reviewed_by:
+          oneOf: [{ $ref: '#/components/schemas/ActorSummary' }, { type: 'null' }]
+        reviewed_at: { type: [string, 'null'], format: date-time }
+        decision_reason: { type: [string, 'null'], maxLength: 500 }
+        history:
+          type: array
+          items: { $ref: '#/components/schemas/ManifestExceptionHistoryEvent' }
+    ManifestExceptionState:
+      type: object
+      additionalProperties: false
+      required: [manifest_id, manifest_state, manifest_version, current_exception, previous_attempts]
+      properties:
+        manifest_id: { type: string, format: uuid }
+        manifest_state: { $ref: '#/components/schemas/ManifestState' }
+        manifest_version: { type: integer, minimum: 1 }
+        current_exception:
+          oneOf: [{ $ref: '#/components/schemas/ManifestException' }, { type: 'null' }]
+        previous_attempts:
+          type: array
+          items: { $ref: '#/components/schemas/ManifestException' }
+    ApproveManifestExceptionRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, expected_exception_version]
+      properties:
+        expected_version: { type: integer, minimum: 1, description: Expected Manifest version. }
+        expected_exception_version: { type: integer, minimum: 1 }
+        decision_reason: { type: [string, 'null'], maxLength: 500 }
+    RejectManifestExceptionRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, expected_exception_version, rejection_reason]
+      properties:
+        expected_version: { type: integer, minimum: 1, description: Expected Manifest version. }
+        expected_exception_version: { type: integer, minimum: 1 }
+        rejection_reason: { type: string, minLength: 1, maxLength: 500 }
+    ResubmitManifestExceptionRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, expected_exception_version, reason_code, description]
+      properties:
+        expected_version: { type: integer, minimum: 1, description: Expected Manifest version. }
+        expected_exception_version: { type: integer, minimum: 1 }
+        reason_code: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string, minLength: 1, maxLength: 500 }
+    ManifestDetail:
+      allOf:
+        - $ref: '#/components/schemas/ManifestListItem'
+        - type: object
+          additionalProperties: false
+          required:
+            - created_by
+            - approved_by
+            - closed_at
+            - parcels
+            - bucket_counts
+            - permitted_actions
+            - status_events
+            - custody_events
+            - movement_evidence
+            - exception_state
+            - timeline
+          properties:
+            created_by:
+              type: string
+              format: uuid
+            approved_by:
+              type: [string, 'null']
+              format: uuid
+            closed_at:
+              type: [string, 'null']
+              format: date-time
+            parcels:
+              type: array
+              items:
+                $ref: '#/components/schemas/ManifestParcel'
+            bucket_counts:
+              type: object
+              additionalProperties: false
+              required: [pending, validated, succeeded, failed, skipped]
+              properties:
+                pending:
+                  type: integer
+                validated:
+                  type: integer
+                succeeded:
+                  type: integer
+                failed:
+                  type: integer
+                skipped:
+                  type: integer
+            permitted_actions:
+              type: array
+              items:
+                type: string
+                enum: [EDIT, INSERT, VALIDATE, CONFIRM, REVIEW_APPROVE, REVIEW_REJECT, RESUBMIT]
+            status_events:
+              type: array
+              items:
+                $ref: '#/components/schemas/ManifestStatusEvent'
+            custody_events:
+              type: array
+              items:
+                $ref: '#/components/schemas/ManifestCustodyEvent'
+            movement_evidence:
+              oneOf: [{ $ref: '#/components/schemas/ManifestMovementEvidence' }, { type: 'null' }]
+            exception_state:
+              oneOf: [{ $ref: '#/components/schemas/ManifestExceptionState' }, { type: 'null' }]
+            timeline:
+              type: array
+              items:
+                $ref: '#/components/schemas/ManifestTimelineEvent'
+    EligibleParcel:
+      type: object
+      additionalProperties: false
+      required:
+        - parcel_id
+        - parcel_number
+        - consignment_id
+        - consignment_number
+        - receiver_contact_name
+        - current_status
+        - eligibility
+      properties:
+        parcel_id:
+          type: string
+          format: uuid
+        parcel_number:
+          type: string
+        consignment_id:
+          type: string
+          format: uuid
+        consignment_number:
+          type: string
+        receiver_contact_name:
+          type: string
+        current_status:
+          type: string
+        eligibility:
+          $ref: '#/components/schemas/ParcelEligibility'
+    ManifestStatusEvent:
+      type: object
+      additionalProperties: false
+      required: [status_event_id, event_sequence, consignment_id, consignment_number, parcel_id, parcel_number, previous_status, new_status, reason_code, initiator_id, initiator_name, node_id, node_title, created_at]
+      properties:
+        status_event_id: { type: string, format: uuid }
+        event_sequence: { type: [integer, 'null'] }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { type: string }
+        parcel_id: { type: [string, 'null'], format: uuid }
+        parcel_number: { type: [string, 'null'] }
+        previous_status: { type: string }
+        new_status: { type: string }
+        reason_code: { type: [string, 'null'] }
+        initiator_id: { type: string, format: uuid }
+        initiator_name: { type: string }
+        node_id: { type: [string, 'null'], format: uuid }
+        node_title: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    ManifestTimelineEvent:
+      type: object
+      additionalProperties: false
+      required: [audit_id, action_key, initiator_id, initiator_name, correlation_id, created_at]
+      properties:
+        audit_id: { type: string, format: uuid }
+        action_key: { type: string }
+        initiator_id: { type: [string, 'null'], format: uuid }
+        initiator_name: { type: string }
+        correlation_id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+    PaginationMeta:
+      type: object
+      additionalProperties: false
+      required: [pagination]
+      properties:
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, page_size, total, total_pages]
+          properties:
+            page:
+              type: integer
+            page_size:
+              type: integer
+            total:
+              type: integer
+            total_pages:
+              type: integer
+    ManifestListSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManifestListItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    ManifestContextOptionsSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          $ref: '#/components/schemas/ManifestContextOptions'
+        meta:
+          type: object
+          additionalProperties: false
+        correlation_id:
+          type: string
+          format: uuid
+    EligibleParcelListSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EligibleParcel'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    ManifestDetailSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          $ref: '#/components/schemas/ManifestDetail'
+        meta:
+          $ref: '#/components/schemas/ManifestDetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    ManifestExceptionSuccess:
+      type: object
+      additionalProperties: false
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          $ref: '#/components/schemas/ManifestExceptionState'
+        meta:
+          type: object
+          additionalProperties: false
+        correlation_id:
+          type: string
+          format: uuid
+    ManifestInputOutcome:
+      type: object
+      additionalProperties: false
+      required: [input, result, reason_code, eligible, severity, presentation]
+      properties:
+        input: { type: string }
+        parcel_number: { type: string }
+        result: { type: string, enum: [ADDED, DUPLICATE, FAILED, NOT_FOUND] }
+        reason_code: { type: string }
+        eligible: { type: boolean }
+        severity: { type: string, enum: [SUCCESS, ERROR] }
+        presentation: { $ref: '#/components/schemas/EligibilityPresentation' }
+    ManifestDetailMeta:
+      type: object
+      additionalProperties: false
+      properties:
+        input_outcomes:
+          type: array
+          items: { $ref: '#/components/schemas/ManifestInputOutcome' }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, field_errors, details, correlation_id]
+      properties:
+        error_code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - AUTHENTICATION_REQUIRED
+            - TENANT_ACCESS_DENIED
+            - ENTITLEMENT_DISABLED
+            - PERMISSION_DENIED
+            - SCOPE_ACCESS_DENIED
+            - RESOURCE_NOT_FOUND
+            - VERSION_CONFLICT
+            - MANIFEST_VERSION_CONFLICT
+            - EXCEPTION_VERSION_CONFLICT
+            - IDEMPOTENCY_KEY_REUSED
+            - MANIFEST_NOT_EDITABLE
+            - MANIFEST_NO_SUCCESSFUL_PARCELS
+            - UNSUPPORTED_MANIFEST_TRANSITION
+            - MANIFEST_SOURCE_STATUS_MISMATCH
+            - CURRENT_NODE_MISMATCH
+            - CUSTODY_MISMATCH
+            - ROUTE_PLAN_UNAVAILABLE
+            - ROUTE_LEG_UNAVAILABLE
+            - ROUTE_LEG_NOT_READY
+            - CONFIG_VERSION_UNAVAILABLE
+            - COVERAGE_NOT_FOUND
+            - COVERAGE_AMBIGUOUS
+            - DRIVER_UNAVAILABLE
+            - DRIVER_INCAPABLE
+            - DRIVER_OUT_OF_SCOPE
+            - VEHICLE_UNAVAILABLE
+            - VEHICLE_INCAPABLE
+            - VEHICLE_OUT_OF_SCOPE
+            - EXCEPTION_REVIEW_REQUIRED
+            - EXCEPTION_ALREADY_DECIDED
+            - EXCEPTION_REVIEWER_CONFLICT
+        message:
+          type: string
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        details:
+          type: object
+        correlation_id:
+          type: string
+          format: uuid
+  responses:
+    AuthenticationRequired:
+      description: Authentication is missing, expired, or invalid.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Tenant, entitlement, permission, or scope denied.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Resource is absent or not visible in scope.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Version or idempotency conflict.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unprocessable:
+      description: Validation, lifecycle, or domain-policy rejection.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'

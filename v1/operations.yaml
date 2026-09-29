@@ -1,0 +1,449 @@
+openapi: 3.1.0
+info:
+  title: Chabok Operations Compatibility API
+  version: 1.2.0
+  description: |
+    Tenant- and node-scoped operational integration/internal APIs. ADR-020 makes
+    Manifest the only Branch Panel transition workflow. Driver/Vehicle and
+    RoutePlan APIs are retained; Pickup/Delivery APIs remain Driver App/internal
+    compatibility surfaces; clustering is internal-only after ROU parity.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Operations
+    description: Classified integration, internal compatibility, and deprecated operations.
+paths:
+  /drivers:
+    get:
+      tags: [Operations]
+      operationId: listOperationalDrivers
+      summary: List active available drivers by capability
+      x-chabok-api-classification: retained-integration-selector
+      parameters:
+        - $ref: '#/components/parameters/NodeId'
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: capability
+          in: query
+          schema: { $ref: '#/components/schemas/DriverCapability' }
+      responses:
+        '200': { $ref: '#/components/responses/DriverList' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /vehicles:
+    get:
+      tags: [Operations]
+      operationId: listOperationalVehicles
+      summary: List active available vehicles
+      x-chabok-api-classification: retained-integration-selector
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses:
+        '200': { $ref: '#/components/responses/VehicleList' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /route-definitions:
+    get:
+      tags: [Operations]
+      operationId: listRouteDefinitions
+      summary: List active reusable directed route definitions.
+      x-chabok-api-classification: retained-integration-configuration
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses:
+        '200': { $ref: '#/components/responses/RouteDefinitionList' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /route-plans:
+    get:
+      tags: [Operations]
+      operationId: listRoutePlans
+      summary: List Route Plans visible at the executing node
+      x-chabok-api-classification: retained-integration-internal
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses:
+        '200': { $ref: '#/components/responses/RoutePlanList' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /route-plans/{id}:
+    get:
+      tags: [Operations]
+      operationId: getRoutePlan
+      summary: Read a Consignment route plan and ordered legs
+      x-chabok-api-classification: retained-integration-internal
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses:
+        '200':
+          description: Active Consignment route plan and ordered legs.
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoutePlanEnvelope' } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /consignments/{consignment_id}/route-plan:
+    post:
+      tags: [Operations]
+      operationId: createConsignmentRoutePlan
+      summary: Resolve and create the active Route Plan from published configuration
+      x-chabok-api-classification: retained-integration-internal
+      description: >-
+        The caller cannot select a route or destination node. Destination Gateway
+        coverage and the connected TRUNK Route Version are resolved fail-closed
+        from canonical Consignment geography and effective published configuration.
+      parameters: [{ $ref: '#/components/parameters/ConsignmentId' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '201': { description: Idempotently resolved and created Route Plan., content: { application/json: { schema: { $ref: '#/components/schemas/RoutePlanEnvelope' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { description: 'COVERAGE_NOT_FOUND, COVERAGE_AMBIGUOUS, ROUTE_NOT_FOUND, ROUTE_AMBIGUOUS, CONFIG_VERSION_UNAVAILABLE, or another domain-policy rejection.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+  /consignments/{consignment_id}/cluster:
+    post:
+      tags: [Operations]
+      operationId: clusterConsignment
+      summary: Select the next ordered route leg and execute IR to ROU.
+      deprecated: true
+      x-chabok-api-classification: internal-only-after-rou-manifest-parity
+      x-chabok-branch-panel-replacement: ROU Manifest
+      parameters: [{ $ref: '#/components/parameters/ConsignmentId' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ExpectedPlanVersionRequest' } } }
+      responses:
+        '200': { description: Updated route plan., content: { application/json: { schema: { $ref: '#/components/schemas/RoutePlanEnvelope' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /pickup-tasks:
+    get:
+      tags: [Operations]
+      operationId: listPickupTasks
+      summary: List pickup tasks at the executing node
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/PickupTaskList' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      tags: [Operations]
+      operationId: createPickupTask
+      summary: Create a pickup task for a confirmed Consignment
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreatePickupTaskRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/PickupTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /pickup-tasks/{id}:
+    get:
+      tags: [Operations]
+      operationId: getPickupTask
+      summary: Read a pickup task
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/PickupTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /pickup-tasks/{id}/assign:
+    post:
+      tags: [Operations]
+      operationId: assignPickupTask
+      summary: Assign an eligible pickup driver and execute CFM to PD.
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-branch-panel-replacement: PD Manifest
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AssignTaskRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/PickupTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /pickup-tasks/{id}/complete:
+    post:
+      tags: [Operations]
+      operationId: completePickupTask
+      summary: Execute PD to PU as the assigned driver or dispatcher.
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-branch-panel-replacement: PU Manifest
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ExpectedVersionRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/PickupTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /pickup-tasks/{id}/fail:
+    post:
+      tags: [Operations]
+      operationId: failPickupTask
+      summary: Deprecated compatibility failure command; NPU requires pending Manifest Exception Review
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-branch-panel-replacement: NPU Manifest Exception submission
+      x-chabok-implementation-status: task-c-correction-required
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FailureRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/PickupTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /delivery-tasks:
+    get:
+      tags: [Operations]
+      operationId: listDeliveryTasks
+      summary: List delivery tasks at the executing node
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      parameters: [{ $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/Search' }, { name: status, in: query, schema: { $ref: '#/components/schemas/DeliveryTaskStatus' } }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/DeliveryTaskList' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /delivery-tasks/{id}:
+    get:
+      tags: [Operations]
+      operationId: getDeliveryTask
+      summary: Read a delivery task
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }]
+      responses: { '200': { $ref: '#/components/responses/DeliveryTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /delivery-tasks/{id}/assign:
+    post:
+      tags: [Operations]
+      operationId: assignDeliveryTask
+      summary: Assign or reassign an eligible final-mile Driver before activation
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-branch-panel-replacement: OD Manifest
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AssignTaskRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/DeliveryTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /delivery-tasks/{id}/complete:
+    post:
+      tags: [Operations]
+      operationId: completeDeliveryTask
+      summary: Record approved manual proof and execute OD to OK only from an active Delivery Task
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-branch-panel-replacement: OK Manifest with no proof requirement
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CompleteDeliveryRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/DeliveryTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /delivery-tasks/{id}/fail:
+    post:
+      tags: [Operations]
+      operationId: failDeliveryTask
+      summary: Deprecated compatibility failure command; NOK requires pending Manifest Exception Review
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-branch-panel-replacement: NOK Manifest Exception submission
+      x-chabok-implementation-status: task-c-correction-required
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FailureRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/DeliveryTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /delivery-tasks/{id}/retry:
+    post:
+      tags: [Operations]
+      operationId: retryDeliveryTask
+      summary: Return an approved failed NOK attempt to the delivery queue with immutable history
+      x-chabok-api-classification: retained-driver-app-internal-compatibility
+      x-chabok-branch-panel-workflow: deprecated
+      x-chabok-implementation-status: task-c-correction-required
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/NodeId' }, { $ref: '#/components/parameters/CorrelationId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RetryDeliveryRequest' } } } }
+      responses: { '200': { $ref: '#/components/responses/DeliveryTaskDetail' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    NodeId: { name: X-Node-Id, in: header, required: true, description: Validated operational scope; never tenant authority., schema: { type: string, format: uuid } }
+    CorrelationId: { name: X-Correlation-ID, in: header, schema: { type: string, format: uuid } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 160 } }
+    Search: { name: search, in: query, schema: { type: string, maxLength: 200 } }
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    ConsignmentId: { name: consignment_id, in: path, required: true, schema: { type: string, format: uuid } }
+  schemas:
+    DriverCapability: { type: string, enum: [PICKUP, LINEHAUL, DELIVERY] }
+    Driver:
+      type: object
+      additionalProperties: false
+      required: [driver_id, driver_code, display_name, home_node_id, status, availability_status, capabilities]
+      properties:
+        driver_id: { type: string, format: uuid }
+        driver_code: { type: string }
+        display_name: { type: string }
+        home_node_id: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        availability_status: { type: string, enum: [AVAILABLE, ON_MISSION, TEMPORARILY_INACTIVE, INACTIVE] }
+        capabilities: { type: array, items: { $ref: '#/components/schemas/DriverCapability' } }
+    Vehicle:
+      type: object
+      additionalProperties: false
+      required: [vehicle_id, vehicle_code, registration_number, vehicle_type, status, availability_status]
+      properties:
+        vehicle_id: { type: string, format: uuid }
+        vehicle_code: { type: string }
+        registration_number: { type: string }
+        vehicle_type: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        availability_status: { type: string, enum: [AVAILABLE, ON_MISSION, MAINTENANCE, INACTIVE] }
+    PickupTask:
+      type: object
+      additionalProperties: false
+      required: [pickup_task_id, consignment_id, consignment_number, sender_name, sender_mobile, pickup_address, pickup_commitment_at, pickup_window_code, node, assigned_driver, status, version, assigned_at, started_at, completed_at, failed_at, created_at]
+      properties:
+        pickup_task_id: { type: string, format: uuid }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { type: [string, 'null'] }
+        sender_name: { type: [string, 'null'] }
+        sender_mobile: { type: [string, 'null'] }
+        pickup_address: { type: [string, 'null'] }
+        pickup_commitment_at: { type: [string, 'null'], format: date-time }
+        pickup_window_code: { type: [string, 'null'] }
+        node: { oneOf: [{ $ref: '#/components/schemas/OperationalNodeReference' }, { type: 'null' }] }
+        assigned_driver: { oneOf: [{ $ref: '#/components/schemas/OperationalDriverReference' }, { type: 'null' }] }
+        status: { type: string, enum: [PENDING, ASSIGNED, IN_PROGRESS, COMPLETED, FAILED] }
+        failure_reason_code: { type: [string, 'null'] }
+        failure_reason: { type: [string, 'null'] }
+        version: { type: integer, minimum: 1 }
+        assigned_at: { type: [string, 'null'], format: date-time }
+        started_at: { type: [string, 'null'], format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
+        failed_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    DeliveryTaskStatus: { type: string, enum: [PENDING, ASSIGNED, IN_PROGRESS, COMPLETED, FAILED] }
+    DeliveryRecipient:
+      type: object
+      additionalProperties: false
+      required: [name, mobile, address]
+      properties: { name: { type: string }, mobile: { type: string }, address: { type: string } }
+    DeliveryTask:
+      type: object
+      required: [delivery_task_id, consignment_id, consignment_number, node_id, assigned_driver_id, manifest_id, status, attempt_number, recipient, recipient_name, proof_type, proof_note, failure_reason_code, failure_reason, version, delivered_at]
+      properties:
+        delivery_task_id: { type: string, format: uuid }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { type: string }
+        node_id: { type: string, format: uuid }
+        assigned_driver_id: { type: [string, 'null'], format: uuid }
+        manifest_id: { type: [string, 'null'], format: uuid }
+        status: { $ref: '#/components/schemas/DeliveryTaskStatus' }
+        attempt_number: { type: integer, minimum: 1 }
+        recipient: { $ref: '#/components/schemas/DeliveryRecipient' }
+        recipient_name: { type: [string, 'null'] }
+        proof_type: { type: [string, 'null'], enum: [MANUAL_CONFIRMATION, null] }
+        proof_note: { type: [string, 'null'] }
+        failure_reason_code: { type: [string, 'null'] }
+        failure_reason: { type: [string, 'null'] }
+        version: { type: integer, minimum: 1 }
+        delivered_at: { type: [string, 'null'], format: date-time }
+    DeliveryTaskHistoryEvent:
+      type: object
+      additionalProperties: false
+      required: [event_type, from_status, to_status, attempt_number, assigned_driver_id, reason_code, safe_note, metadata, occurred_at]
+      properties: { event_type: { type: string, enum: [CREATED, ASSIGNED, REASSIGNED, ACTIVATED, COMPLETED, FAILED, RETRY_REQUESTED] }, from_status: { type: [string, 'null'] }, to_status: { $ref: '#/components/schemas/DeliveryTaskStatus' }, attempt_number: { type: integer, minimum: 1 }, assigned_driver_id: { type: [string, 'null'], format: uuid }, reason_code: { type: [string, 'null'] }, safe_note: { type: [string, 'null'] }, metadata: { type: [object, 'null'], additionalProperties: true }, occurred_at: { type: string, format: date-time } }
+    LastMileResolutionEvidence:
+      type: object
+      additionalProperties: false
+      required: [last_mile_resolution_id, destination_gateway_node_id, last_mile_node_id, coverage_policy_id, coverage_policy_version_id, coverage_rule_id, route_definition_version_id, resolution_input, resolved_at]
+      properties: { last_mile_resolution_id: { type: string, format: uuid }, destination_gateway_node_id: { type: string, format: uuid }, last_mile_node_id: { type: string, format: uuid }, coverage_policy_id: { type: string, format: uuid }, coverage_policy_version_id: { type: string, format: uuid }, coverage_rule_id: { type: string, format: uuid }, route_definition_version_id: { type: [string, 'null'], format: uuid }, resolution_input: { type: object, additionalProperties: true }, resolved_at: { type: string, format: date-time } }
+    DeliveryTaskDetail:
+      unevaluatedProperties: false
+      allOf:
+        - { $ref: '#/components/schemas/DeliveryTask' }
+        - type: object
+          required: [node, driver, parcels, history, last_mile_resolution, route_progress, permitted_actions]
+          properties:
+            node: { $ref: '#/components/schemas/OperationalNodeReference' }
+            driver: { oneOf: [{ $ref: '#/components/schemas/OperationalDriverReference' }, { type: 'null' }] }
+            parcels: { type: array, items: { $ref: '#/components/schemas/OperationalParcel' } }
+            history: { type: array, items: { $ref: '#/components/schemas/DeliveryTaskHistoryEvent' } }
+            last_mile_resolution: { oneOf: [{ $ref: '#/components/schemas/LastMileResolutionEvidence' }, { type: 'null' }] }
+            route_progress: { type: array, items: { $ref: '#/components/schemas/RouteProgressLeg' } }
+            permitted_actions: { type: array, uniqueItems: true, items: { type: string, enum: [ASSIGN, REASSIGN, COMPLETE, FAIL, RETRY] } }
+    RouteLeg:
+      type: object
+      additionalProperties: false
+      required: [route_plan_leg_id, source_route_definition_version_leg_id, leg_order, origin_node, destination_node, status]
+      properties:
+        route_plan_leg_id: { type: string, format: uuid }
+        source_route_definition_version_leg_id: { type: [string, 'null'], format: uuid }
+        leg_order: { type: integer, minimum: 1 }
+        origin_node: { $ref: '#/components/schemas/OperationalNodeReference' }
+        destination_node: { $ref: '#/components/schemas/OperationalNodeReference' }
+        status: { type: string, enum: [PENDING, ROUTED, OUTBOUND_CONFIRMED, IN_TRANSIT, RECEIVED] }
+        routed_at: { type: [string, 'null'], format: date-time }
+        received_at: { type: [string, 'null'], format: date-time }
+    ResolvedRouteLegEvidence:
+      type: object
+      additionalProperties: false
+      required: [route_definition_version_leg_id, leg_order, origin_node_id, destination_node_id]
+      properties:
+        route_definition_version_leg_id: { type: string, format: uuid }
+        leg_order: { type: integer, minimum: 1 }
+        origin_node_id: { type: string, format: uuid }
+        destination_node_id: { type: string, format: uuid }
+    RouteResolutionEvidence:
+      type: object
+      additionalProperties: false
+      required: [coverage_policy_id, coverage_policy_code, coverage_policy_title, coverage_policy_version_id, coverage_policy_version_number, coverage_rule_id, coverage_criterion_type, coverage_priority, resolution_input, matched_geography_evidence, matched_postal_evidence, matched_geometry_evidence, destination_gateway, route_definition_id, route_definition_version_id, route_purpose, ordered_route_legs, offering_version_id, resolved_at]
+      properties:
+        coverage_policy_id: { type: string, format: uuid }
+        coverage_policy_code: { type: string }
+        coverage_policy_title: { type: string }
+        coverage_policy_version_id: { type: string, format: uuid }
+        coverage_policy_version_number: { type: integer, minimum: 1 }
+        coverage_rule_id: { type: string, format: uuid }
+        coverage_criterion_type: { type: string, enum: [PROVINCE, CITY, POSTAL_RANGE, POLYGON, POINT_RADIUS] }
+        coverage_priority: { type: integer }
+        resolution_input: { type: object, additionalProperties: true }
+        matched_geography_evidence: { type: [object, 'null'], additionalProperties: true }
+        matched_postal_evidence: { type: [object, 'null'], additionalProperties: true }
+        matched_geometry_evidence: { type: [object, 'null'], additionalProperties: true }
+        destination_gateway: { $ref: '#/components/schemas/OperationalNodeReference' }
+        route_definition_id: { type: string, format: uuid }
+        route_definition_version_id: { type: string, format: uuid }
+        route_purpose: { type: string, enum: [TRUNK, LAST_MILE] }
+        ordered_route_legs: { type: array, minItems: 1, items: { $ref: '#/components/schemas/ResolvedRouteLegEvidence' } }
+        offering_version_id: { type: [string, 'null'], format: uuid }
+        resolved_at: { type: string, format: date-time }
+    RoutePlan:
+      type: object
+      additionalProperties: false
+      required: [route_plan_id, consignment_id, consignment_number, route_definition_id, route_definition_version_id, route_code, route_title, status, configuration_state, version, created_at, resolution_evidence, legs]
+      properties:
+        route_plan_id: { type: string, format: uuid }
+        consignment_id: { type: string, format: uuid }
+        consignment_number: { type: [string, 'null'] }
+        route_definition_id: { type: string, format: uuid }
+        route_definition_version_id: { type: [string, 'null'], format: uuid }
+        route_code: { type: [string, 'null'] }
+        route_title: { type: [string, 'null'] }
+        status: { type: string, enum: [PLANNED, IN_PROGRESS, COMPLETED, SUPERSEDED, CANCELLED] }
+        configuration_state: { type: string, enum: [AVAILABLE, STALE, UNAVAILABLE] }
+        version: { type: integer, minimum: 1 }
+        created_at: { type: string, format: date-time }
+        resolution_evidence: { oneOf: [{ $ref: '#/components/schemas/RouteResolutionEvidence' }, { type: 'null' }] }
+        legs: { type: array, items: { $ref: '#/components/schemas/RouteLeg' } }
+    RouteDefinition:
+      type: object
+      additionalProperties: false
+      required: [route_definition_id, route_code, route_title, status, legs]
+      properties:
+        route_definition_id: { type: string, format: uuid }
+        route_code: { type: string }
+        route_title: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        legs: { type: array, items: { type: object, additionalProperties: true } }
+    OperationalNodeReference: { type: object, additionalProperties: false, required: [node_id, node_code, node_title], properties: { node_id: { type: string, format: uuid }, node_code: { type: string }, node_title: { type: string } } }
+    OperationalDriverReference: { type: object, additionalProperties: false, required: [driver_id, driver_code, display_name], properties: { driver_id: { type: string, format: uuid }, driver_code: { type: string }, display_name: { type: string } } }
+    OperationalParcel: { type: object, additionalProperties: false, required: [parcel_id, parcel_number, current_status, current_node_id, current_custody_type, current_custodian_id], properties: { parcel_id: { type: string, format: uuid }, parcel_number: { type: string }, consignment_id: { type: string, format: uuid }, consignment_number: { type: string }, current_status: { type: string }, current_node_id: { type: [string, 'null'], format: uuid }, current_custody_type: { type: string }, current_custodian_id: { type: [string, 'null'], format: uuid }, is_loaded: { type: boolean }, loaded_at: { type: [string, 'null'], format: date-time } } }
+    RouteProgressLeg: { type: object, additionalProperties: false, required: [route_plan_leg_id, leg_order, status, origin_node, destination_node, routed_at, received_at], properties: { route_plan_leg_id: { type: string, format: uuid }, leg_order: { type: integer, minimum: 1 }, status: { type: string, enum: [PENDING, ROUTED, OUTBOUND_CONFIRMED, IN_TRANSIT, RECEIVED] }, origin_node: { $ref: '#/components/schemas/OperationalNodeReference' }, destination_node: { $ref: '#/components/schemas/OperationalNodeReference' }, routed_at: { type: [string, 'null'], format: date-time }, received_at: { type: [string, 'null'], format: date-time } } }
+    CreatePickupTaskRequest: { type: object, additionalProperties: false, required: [consignment_id], properties: { consignment_id: { type: string, format: uuid } } }
+    AssignTaskRequest: { type: object, additionalProperties: false, required: [driver_id, expected_version], properties: { driver_id: { type: string, format: uuid }, expected_version: { type: integer, minimum: 1 } } }
+    ExpectedVersionRequest: { type: object, additionalProperties: false, required: [expected_version], properties: { expected_version: { type: integer, minimum: 1 } } }
+    ExpectedPlanVersionRequest: { type: object, additionalProperties: false, required: [expected_route_plan_version], properties: { expected_route_plan_version: { type: integer, minimum: 1 } } }
+    FailureRequest: { type: object, additionalProperties: false, required: [expected_version, reason_code, reason], properties: { expected_version: { type: integer, minimum: 1 }, reason_code: { type: string, maxLength: 80 }, reason: { type: string, maxLength: 500 } } }
+    CompleteDeliveryRequest: { type: object, additionalProperties: false, required: [expected_version, recipient_name, delivered_at, proof_type], properties: { expected_version: { type: integer, minimum: 1 }, recipient_name: { type: string, maxLength: 200 }, delivered_at: { type: string, format: date-time }, proof_type: { type: string, const: MANUAL_CONFIRMATION }, note: { type: [string, 'null'], maxLength: 500 } } }
+    RetryDeliveryRequest: { type: object, additionalProperties: false, required: [expected_version, reason], properties: { expected_version: { type: integer, minimum: 1 }, reason: { type: string, maxLength: 500 } } }
+    ErrorEnvelope: { type: object, additionalProperties: true, required: [error, meta], properties: { error: { type: object, additionalProperties: true }, meta: { type: object, additionalProperties: true } } }
+    DriverListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/Driver' } }, meta: { type: object, additionalProperties: true } } }
+    VehicleListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/Vehicle' } }, meta: { type: object, additionalProperties: true } } }
+    RouteDefinitionListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/RouteDefinition' } }, meta: { type: object, additionalProperties: true } } }
+    PickupTaskListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/PickupTask' } }, meta: { type: object, additionalProperties: true } } }
+    DeliveryTaskListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/DeliveryTask' } }, meta: { type: object, additionalProperties: true } } }
+    PickupTaskEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/PickupTask' }, meta: { type: object, additionalProperties: true } } }
+    DeliveryTaskEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/DeliveryTaskDetail' }, meta: { type: object, additionalProperties: true } } }
+    RoutePlanEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/RoutePlan' }, meta: { type: object, additionalProperties: true } } }
+    RoutePlanListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/RoutePlan' } }, meta: { type: object, additionalProperties: true } } }
+  responses:
+    DriverList: { description: Visible eligible drivers., content: { application/json: { schema: { $ref: '#/components/schemas/DriverListEnvelope' } } } }
+    VehicleList: { description: Visible vehicles., content: { application/json: { schema: { $ref: '#/components/schemas/VehicleListEnvelope' } } } }
+    RouteDefinitionList: { description: Visible route definitions., content: { application/json: { schema: { $ref: '#/components/schemas/RouteDefinitionListEnvelope' } } } }
+    PickupTaskList: { description: Visible pickup tasks., content: { application/json: { schema: { $ref: '#/components/schemas/PickupTaskListEnvelope' } } } }
+    DeliveryTaskList: { description: Visible delivery tasks., content: { application/json: { schema: { $ref: '#/components/schemas/DeliveryTaskListEnvelope' } } } }
+    PickupTaskDetail: { description: Pickup task state., content: { application/json: { schema: { $ref: '#/components/schemas/PickupTaskEnvelope' } } } }
+    RoutePlanList: { description: Route Plans visible at the executing node., content: { application/json: { schema: { $ref: '#/components/schemas/RoutePlanListEnvelope' } } } }
+    DeliveryTaskDetail: { description: Delivery task state., content: { application/json: { schema: { $ref: '#/components/schemas/DeliveryTaskEnvelope' } } } }
+    Forbidden: { description: 'Tenant, entitlement, permission, or node scope denied.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    NotFound: { description: Resource is not visible., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Conflict: { description: Version or idempotency conflict., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    Unprocessable: { description: Validation or lifecycle rejection., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
