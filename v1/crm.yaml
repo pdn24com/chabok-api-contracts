@@ -11,6 +11,10 @@ security:
 - bearerAuth: []
 tags:
 - name: CRM - Catalog
+- name: Customers
+- name: Customer Addresses
+- name: Customer Org Structure
+- name: Customer History
 - name: CRM - Sales Funnels & Opportunities
 - name: CRM - Sales Documents
 - name: CRM - Finance
