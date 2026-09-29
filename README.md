@@ -12,6 +12,7 @@ Authoritative OpenAPI 3.1 contracts for the Chabok platform APIs:
 - Operations
 - Network
 - Fleet
+- CRM
 
 ## Validate contracts
 

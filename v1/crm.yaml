@@ -1,0 +1,2006 @@
+openapi: 3.1.0
+info:
+  title: Chabok CRM API
+  version: 1.0.0
+  description: CRM catalog, sales funnels and opportunities, sales documents, customer finance and tasks.
+    Authored from the CRM handoff definition; enum values absent from that definition are typed as plain
+    strings until confirmed. Tasks are served under /api/v1/tasks.
+servers:
+- url: /api/v1
+security:
+- bearerAuth: []
+tags:
+- name: CRM - Catalog
+- name: CRM - Sales Funnels & Opportunities
+- name: CRM - Sales Documents
+- name: CRM - Finance
+- name: CRM - Tasks
+paths:
+  /crm/industries:
+    get:
+      tags:
+      - CRM - Catalog
+      operationId: listCrmIndustries
+      summary: List industries
+      x-chabok-permission: crm.industry.view
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: search
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+      - name: is_active
+        in: query
+        schema:
+          type: boolean
+      - &id001
+        $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/IndustryList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/sales-funnels:
+    get:
+      tags:
+      - CRM - Sales Funnels & Opportunities
+      operationId: listCrmSalesFunnels
+      summary: List sales funnels (not paginated)
+      x-chabok-permission: crm.opportunity.view
+      parameters:
+      - name: active
+        in: query
+        schema:
+          type: boolean
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/SalesFunnelList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/opportunities:
+    get:
+      tags:
+      - CRM - Sales Funnels & Opportunities
+      operationId: getCrmOpportunityBoard
+      summary: Opportunity kanban board
+      x-chabok-permission: crm.opportunity.view
+      parameters:
+      - name: funnel_id
+        in: query
+        required: true
+        schema: &id002
+          type: integer
+      - name: customer_id
+        in: query
+        schema: *id002
+      - name: assignee_id
+        in: query
+        schema: *id002
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/OpportunityBoard'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - CRM - Sales Funnels & Opportunities
+      operationId: createCrmOpportunity
+      summary: Create an opportunity
+      x-chabok-permission: crm.opportunity.manage
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOpportunityRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/OpportunityWithEvent'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/opportunities/{opportunityId}/step-transitions:
+    post:
+      tags:
+      - CRM - Sales Funnels & Opportunities
+      operationId: transitionCrmOpportunityStep
+      summary: Move an opportunity to another funnel step
+      x-chabok-permission: crm.opportunity.manage
+      parameters:
+      - $ref: '#/components/parameters/OpportunityId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepTransitionRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/OpportunityWithEvent'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/opportunities/{opportunityId}/events:
+    get:
+      tags:
+      - CRM - Sales Funnels & Opportunities
+      operationId: listCrmOpportunityEvents
+      summary: List opportunity step events
+      x-chabok-permission: crm.opportunity.view
+      parameters:
+      - $ref: '#/components/parameters/OpportunityId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/OpportunityEventList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /crm/sales-documents:
+    get:
+      tags:
+      - CRM - Sales Documents
+      operationId: listCrmSalesDocuments
+      summary: List sales documents
+      x-chabok-permission: crm.sales_document.view
+      parameters:
+      - name: customer_id
+        in: query
+        schema: *id002
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/SalesDocumentStatus'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/SalesDocumentList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - CRM - Sales Documents
+      operationId: createCrmSalesDocument
+      summary: Create a sales document with its first version
+      x-chabok-permission: crm.sales_document.manage
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSalesDocumentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/SalesDocument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/sales-documents/{documentId}:
+    get:
+      tags:
+      - CRM - Sales Documents
+      operationId: getCrmSalesDocument
+      summary: Get a sales document
+      x-chabok-permission: crm.sales_document.view
+      parameters:
+      - $ref: '#/components/parameters/DocumentId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/SalesDocument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /crm/sales-documents/{documentId}/versions:
+    post:
+      tags:
+      - CRM - Sales Documents
+      operationId: createCrmSalesDocumentVersion
+      summary: Create a new revision
+      x-chabok-permission: crm.sales_document.manage
+      parameters:
+      - $ref: '#/components/parameters/DocumentId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSalesDocumentVersionRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/SalesDocument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/sales-document-versions/{versionId}/issue:
+    post:
+      tags:
+      - CRM - Sales Documents
+      operationId: issueCrmSalesDocumentVersion
+      summary: Issue a sales document version
+      x-chabok-permission: crm.sales_document.manage
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/SalesDocumentVersion'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/sales-document-versions/{versionId}/accept:
+    post:
+      tags:
+      - CRM - Sales Documents
+      operationId: acceptCrmSalesDocumentVersion
+      summary: Accept a sales document version
+      x-chabok-permission: crm.sales_document.manage
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/SalesDocumentVersion'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/sales-document-versions/{versionId}/cancel:
+    post:
+      tags:
+      - CRM - Sales Documents
+      operationId: cancelCrmSalesDocumentVersion
+      summary: Cancel a sales document version
+      x-chabok-permission: crm.sales_document.manage
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/SalesDocumentVersion'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/bank-accounts:
+    get:
+      tags:
+      - CRM - Finance
+      operationId: listCrmCustomerBankAccounts
+      summary: List a customer's bank accounts
+      x-chabok-permission: crm.finance.view
+      parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/BankAccountList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+      - CRM - Finance
+      operationId: createCrmCustomerBankAccount
+      summary: Add a bank account
+      x-chabok-permission: crm.finance.manage
+      parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBankAccountRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/BankAccount'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/external-invoices:
+    get:
+      tags:
+      - CRM - Finance
+      operationId: listCrmCustomerExternalInvoices
+      summary: List a customer's external invoices
+      x-chabok-permission: crm.finance.view
+      parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/ExternalInvoiceList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+      - CRM - Finance
+      operationId: createCrmCustomerExternalInvoice
+      summary: Record an external invoice
+      x-chabok-permission: crm.finance.manage
+      parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExternalInvoiceRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ExternalInvoice'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/financial-entries:
+    get:
+      tags:
+      - CRM - Finance
+      operationId: listCrmCustomerFinancialEntries
+      summary: List the whole ledger (not paginated)
+      x-chabok-permission: crm.finance.view
+      parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - name: kind
+        in: query
+        schema:
+          $ref: '#/components/schemas/FinancialEntryKind'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/FinancialEntryList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - CRM - Finance
+      operationId: createCrmCustomerFinancialEntry
+      summary: Post a financial entry
+      x-chabok-permission: crm.finance.manage
+      parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFinancialEntryRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/FinancialEntry'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/financial-entries/{entryId}/allocations:
+    post:
+      tags:
+      - CRM - Finance
+      operationId: allocateCrmFinancialEntry
+      summary: Allocate a receipt to an invoice
+      x-chabok-permission: crm.finance.manage
+      parameters:
+      - $ref: '#/components/parameters/EntryId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAllocationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/FinancialAllocation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /tasks:
+    get:
+      tags:
+      - CRM - Tasks
+      operationId: listCrmTasks
+      summary: List tasks
+      x-chabok-permission: crm.task.view
+      parameters:
+      - name: scope
+        in: query
+        schema:
+          $ref: '#/components/schemas/TaskScope'
+      - name: bucket
+        in: query
+        schema:
+          $ref: '#/components/schemas/TaskBucket'
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/TaskList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - CRM - Tasks
+      operationId: createCrmTask
+      summary: Create a task
+      x-chabok-permission: crm.task.manage
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Task'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    OpportunityId:
+      name: opportunityId
+      in: path
+      required: true
+      schema:
+        type: integer
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: integer
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: integer
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: integer
+    EntryId:
+      name: entryId
+      in: path
+      required: true
+      schema:
+        type: integer
+  schemas:
+    FunnelStepOutcome:
+      type: string
+      description: FunnelStepOutcome values were not included in the source definition; tighten to an
+        enum once confirmed.
+    SalesDocumentStatus:
+      type: string
+      description: SalesDocumentStatus values were not included in the source definition; tighten to an
+        enum once confirmed.
+    SalesDocumentType:
+      type: string
+      description: SalesDocumentType values were not included in the source definition; tighten to an
+        enum once confirmed.
+    BankAccountStatus:
+      type: string
+      description: BankAccountStatus values were not included in the source definition; tighten to an
+        enum once confirmed.
+    FinancialEntryKind:
+      type: string
+      description: FinancialEntryKind values were not included in the source definition; tighten to an
+        enum once confirmed.
+    TaskScope:
+      type: string
+      description: TaskScope values were not included in the source definition; tighten to an enum once
+        confirmed.
+    TaskBucket:
+      type: string
+      description: TaskBucket values were not included in the source definition; tighten to an enum once
+        confirmed.
+    TaskPriority:
+      type: string
+      description: TaskPriority values were not included in the source definition; tighten to an enum
+        once confirmed.
+    TaskStatus:
+      type: string
+      description: TaskStatus values were not included in the source definition; tighten to an enum once
+        confirmed.
+    Industry:
+      type: object
+      additionalProperties: false
+      properties:
+        industry_id: *id002
+        code:
+          type: string
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        is_active:
+          type: boolean
+        sort_order: *id002
+      required:
+      - industry_id
+      - code
+      - title
+      - is_active
+      - sort_order
+    FunnelStep:
+      type: object
+      additionalProperties: false
+      properties:
+        sales_funnel_step_id: *id002
+        code:
+          type: string
+        title:
+          type: string
+        sort_order: *id002
+        outcome_type:
+          $ref: '#/components/schemas/FunnelStepOutcome'
+        is_active:
+          type: boolean
+      required:
+      - sales_funnel_step_id
+      - code
+      - title
+      - sort_order
+      - outcome_type
+      - is_active
+    SalesFunnel:
+      type: object
+      additionalProperties: false
+      properties:
+        sales_funnel_id: *id002
+        code:
+          type: string
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        catalog_item_id:
+          type:
+          - integer
+          - 'null'
+        is_active:
+          type: boolean
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/FunnelStep'
+      required:
+      - sales_funnel_id
+      - code
+      - title
+      - is_active
+      - steps
+    OpportunityCard:
+      type: object
+      additionalProperties: false
+      properties:
+        opportunity_id: *id002
+        title:
+          type: string
+        customer_id: *id002
+        customer:
+          type: object
+          additionalProperties: false
+          properties:
+            customer_id: *id002
+            display_name:
+              type: string
+            phase:
+              type: string
+        assignee_id: *id002
+        assignee:
+          type: object
+          additionalProperties: false
+          properties:
+            user_id: *id002
+            display_name:
+              type: string
+        amount:
+          type:
+          - integer
+          - 'null'
+        probability:
+          type:
+          - string
+          - 'null'
+          description: Decimal string, 0-100.
+        expected_close:
+          type:
+          - integer
+          - 'null'
+          description: Unix timestamp.
+        next_task:
+          type: object
+          additionalProperties: false
+          properties:
+            task_id: *id002
+            title:
+              type: string
+            status:
+              $ref: '#/components/schemas/TaskStatus'
+            due_at:
+              type:
+              - string
+              - 'null'
+              format: date-time
+      required:
+      - opportunity_id
+      - title
+      - customer_id
+      - assignee_id
+      - amount
+      - probability
+      - expected_close
+    OpportunityBoard:
+      type: object
+      additionalProperties: false
+      properties:
+        funnel:
+          $ref: '#/components/schemas/SalesFunnel'
+        columns:
+          type: array
+          description: Every funnel step is a column, even when empty.
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              step:
+                $ref: '#/components/schemas/FunnelStep'
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OpportunityCard'
+            required:
+            - step
+            - items
+      required:
+      - funnel
+      - columns
+    Opportunity:
+      type: object
+      additionalProperties: false
+      properties:
+        opportunity_id: *id002
+        customer_id: *id002
+        funnel_id: *id002
+        title:
+          type: string
+        assignee_id: *id002
+        amount:
+          type:
+          - integer
+          - 'null'
+        probability:
+          type:
+          - string
+          - 'null'
+        expected_close:
+          type:
+          - integer
+          - 'null'
+        close_reason:
+          type:
+          - string
+          - 'null'
+        current_step_id: *id002
+        current_step:
+          $ref: '#/components/schemas/FunnelStep'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - opportunity_id
+      - customer_id
+      - funnel_id
+      - title
+      - assignee_id
+      - current_step_id
+    OpportunityEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        opportunity_event_id: *id002
+        opportunity_id: *id002
+        from_step_id:
+          type:
+          - integer
+          - 'null'
+        from_step_code:
+          type:
+          - string
+          - 'null'
+        from_step_title:
+          type:
+          - string
+          - 'null'
+        from_outcome_type:
+          type:
+          - string
+          - 'null'
+        to_step_id: *id002
+        to_step_code:
+          type: string
+        to_step_title:
+          type: string
+        to_outcome_type:
+          type: string
+        funnel_id: *id002
+        funnel_title:
+          type: string
+        reason:
+          type:
+          - string
+          - 'null'
+        evidence_activity_id:
+          type:
+          - integer
+          - 'null'
+        occurred_at:
+          type: string
+          format: date-time
+        actor:
+          type: object
+          additionalProperties: false
+          properties:
+            user_id: *id002
+            display_name:
+              type: string
+          required:
+          - user_id
+          - display_name
+      required:
+      - opportunity_event_id
+      - opportunity_id
+      - to_step_id
+      - occurred_at
+    OpportunityWithEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        opportunity:
+          $ref: '#/components/schemas/Opportunity'
+        event:
+          $ref: '#/components/schemas/OpportunityEvent'
+      required:
+      - opportunity
+      - event
+    CreateOpportunityRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        funnel_id: *id002
+        title:
+          type: string
+          maxLength: 200
+        assignee_id: *id002
+        amount:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        probability:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 100
+          multipleOf: 0.01
+        expected_close:
+          type:
+          - integer
+          - 'null'
+          description: Unix timestamp.
+      required:
+      - customer_id
+      - funnel_id
+      - title
+      - assignee_id
+      description: current_step_id is prohibited; the server picks the first funnel step.
+    StepTransitionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        from_step_id:
+          type: integer
+          description: Concurrency guard; stale value is rejected.
+        to_step_id: *id002
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        occurred_at:
+          type:
+          - integer
+          - 'null'
+          description: Unix timestamp; defaults to now.
+        evidence_activity_id:
+          type:
+          - integer
+          - 'null'
+        close_reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+      required:
+      - from_step_id
+      - to_step_id
+    CustomerRef:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        display_name:
+          type: string
+      required:
+      - customer_id
+      - display_name
+    SalesDocumentVersion:
+      type: object
+      additionalProperties: false
+      properties:
+        sales_document_version_id: *id002
+        version_no: *id002
+        previous_version_id:
+          type:
+          - integer
+          - 'null'
+        status:
+          $ref: '#/components/schemas/SalesDocumentStatus'
+        currency:
+          type: string
+        total: *id002
+        terms:
+          type:
+          - string
+          - 'null'
+        expires_at:
+          type:
+          - string
+          - 'null'
+        issued_at:
+          type:
+          - string
+          - 'null'
+        content_hash:
+          type:
+          - string
+          - 'null'
+        customer_snapshot:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - sales_document_version_id
+      - version_no
+      - status
+      - currency
+      - total
+    SalesDocumentListItem:
+      type: object
+      additionalProperties: false
+      properties:
+        sales_document_id: *id002
+        document_no:
+          type: string
+        document_type:
+          $ref: '#/components/schemas/SalesDocumentType'
+        customer:
+          oneOf:
+          - $ref: '#/components/schemas/CustomerRef'
+          - type: 'null'
+        current_version:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              sales_document_version_id: *id002
+              version_no: *id002
+              status:
+                $ref: '#/components/schemas/SalesDocumentStatus'
+              currency:
+                type: string
+              total: *id002
+              expires_at:
+                type:
+                - string
+                - 'null'
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - sales_document_id
+      - document_no
+      - document_type
+    SalesDocument:
+      type: object
+      additionalProperties: false
+      properties:
+        sales_document_id: *id002
+        document_no:
+          type: string
+        document_type:
+          $ref: '#/components/schemas/SalesDocumentType'
+        customer:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              customer_id: *id002
+              display_name:
+                type: string
+              customer_code:
+                type: string
+            required:
+            - customer_id
+            - display_name
+          - type: 'null'
+        opportunity:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              opportunity_id: *id002
+              title:
+                type: string
+          - type: 'null'
+        current_version:
+          oneOf:
+          - $ref: '#/components/schemas/SalesDocumentVersion'
+          - type: 'null'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesDocumentVersion'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - sales_document_id
+      - document_no
+      - document_type
+      - versions
+    CreateSalesDocumentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        opportunity_id:
+          type: integer
+          description: Customer is derived from the opportunity.
+        document_type:
+          $ref: '#/components/schemas/SalesDocumentType'
+        document_no:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+          description: Null lets the server generate the next number for type and year.
+        version:
+          type: object
+          additionalProperties: false
+          properties:
+            currency:
+              type: string
+              pattern: ^[A-Z]{3}$
+              examples:
+              - IRR
+            total:
+              type: integer
+              minimum: 0
+            expires_at:
+              type: string
+              format: date
+            terms:
+              type:
+              - string
+              - 'null'
+              maxLength: 5000
+          required:
+          - currency
+          - total
+          - expires_at
+      required:
+      - opportunity_id
+      - document_type
+      - version
+    CreateSalesDocumentVersionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+          examples:
+          - IRR
+        total:
+          type: integer
+          minimum: 0
+        expires_at:
+          type: string
+          format: date
+        terms:
+          type:
+          - string
+          - 'null'
+          maxLength: 5000
+      description: All fields optional; an empty body restates the previous revision.
+    BankAccount:
+      type: object
+      additionalProperties: false
+      properties:
+        bank_account_id: *id002
+        customer_id: *id002
+        bank_name:
+          type: string
+        iban_masked:
+          type:
+          - string
+          - 'null'
+        card_number_masked:
+          type:
+          - string
+          - 'null'
+        account_no_masked:
+          type:
+          - string
+          - 'null'
+        is_primary:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/BankAccountStatus'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - bank_account_id
+      - customer_id
+      - bank_name
+      - is_primary
+      - status
+    CreateBankAccountRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        bank_name:
+          type: string
+          maxLength: 120
+        status:
+          $ref: '#/components/schemas/BankAccountStatus'
+        iban:
+          type:
+          - string
+          - 'null'
+          pattern: ^IR\d{24}$
+        card_number:
+          type:
+          - string
+          - 'null'
+          pattern: ^\d{16}$
+        account_no:
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+        is_primary:
+          type: boolean
+      required:
+      - bank_name
+      - status
+      description: 'Domain rule: at least one of iban, card_number, account_no is required.'
+    ExternalInvoice:
+      type: object
+      additionalProperties: false
+      properties:
+        external_invoice_id: *id002
+        customer_id: *id002
+        external_system:
+          type: string
+        reference_no:
+          type: string
+        amount: *id002
+        issued_on:
+          type: integer
+          description: Unix timestamp.
+        due_on:
+          type:
+          - integer
+          - 'null'
+          description: Unix timestamp.
+        contract_id:
+          type:
+          - integer
+          - 'null'
+        opportunity_id:
+          type:
+          - integer
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - external_invoice_id
+      - customer_id
+      - external_system
+      - reference_no
+      - amount
+      - issued_on
+    CreateExternalInvoiceRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        external_system:
+          type: string
+          maxLength: 80
+        reference_no:
+          type: string
+          maxLength: 120
+        amount:
+          type: integer
+          minimum: 1
+        issued_on:
+          type: integer
+          description: Unix timestamp.
+        due_on:
+          type:
+          - integer
+          - 'null'
+          description: Unix timestamp; must not precede issued_on.
+        opportunity_id:
+          type:
+          - integer
+          - 'null'
+      required:
+      - external_system
+      - reference_no
+      - amount
+      - issued_on
+    FinancialEntry:
+      type: object
+      additionalProperties: false
+      properties:
+        financial_entry_id: *id002
+        customer_id: *id002
+        kind:
+          $ref: '#/components/schemas/FinancialEntryKind'
+        amount: *id002
+        effective_on:
+          type: integer
+          description: Unix timestamp.
+        source_ref:
+          type: string
+        invoice_id:
+          type:
+          - integer
+          - 'null'
+        reverses_id:
+          type:
+          - integer
+          - 'null'
+        allocated: *id002
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - financial_entry_id
+      - customer_id
+      - kind
+      - amount
+      - effective_on
+      - source_ref
+      - allocated
+    CreateFinancialEntryRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: '#/components/schemas/FinancialEntryKind'
+        amount:
+          type: integer
+          not:
+            const: 0
+          description: Signed; a reversal is negative.
+        effective_on:
+          type: integer
+          description: Unix timestamp.
+        source_ref:
+          type: string
+          maxLength: 120
+        invoice_id:
+          type:
+          - integer
+          - 'null'
+        reverses_id:
+          type:
+          - integer
+          - 'null'
+      required:
+      - kind
+      - amount
+      - effective_on
+      - source_ref
+    FinancialAllocation:
+      type: object
+      additionalProperties: false
+      properties:
+        financial_allocation_id: *id002
+        receipt_entry_id: *id002
+        invoice_id: *id002
+        amount: *id002
+        remaining: *id002
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - financial_allocation_id
+      - receipt_entry_id
+      - invoice_id
+      - amount
+      - remaining
+    CreateAllocationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        invoice_id: *id002
+        amount:
+          type: integer
+          minimum: 1
+          description: Must not exceed the remaining amount of the receipt.
+      required:
+      - invoice_id
+      - amount
+    Task:
+      type: object
+      additionalProperties: false
+      properties:
+        task_id: *id002
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        priority:
+          $ref: '#/components/schemas/TaskPriority'
+        due_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        remind_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        completed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        completion_result:
+          type:
+          - string
+          - 'null'
+        assignee:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              user_id: *id002
+              display_name:
+                type: string
+          - type: 'null'
+        customer:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              customer_id: *id002
+              display_name:
+                type: string
+          - type: 'null'
+        opportunity:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              opportunity_id: *id002
+              title:
+                type: string
+          - type: 'null'
+        is_overdue:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - task_id
+      - title
+      - status
+      - priority
+      - is_overdue
+    TaskList:
+      type: object
+      additionalProperties: false
+      properties:
+        summary:
+          type: object
+          additionalProperties: false
+          properties:
+            open: *id002
+            waiting_customer: *id002
+            today: *id002
+            overdue: *id002
+            internal: *id002
+          required:
+          - open
+          - waiting_customer
+          - today
+          - overdue
+          - internal
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      required:
+      - summary
+      - items
+    CreateTaskRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type:
+          - string
+          - 'null'
+          maxLength: 5000
+        priority:
+          $ref: '#/components/schemas/TaskPriority'
+        due_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        remind_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Must be before due_at.
+        customer_id:
+          type:
+          - integer
+          - 'null'
+        opportunity_id:
+          type:
+          - integer
+          - 'null'
+        assignee_id:
+          type:
+          - integer
+          - 'null'
+        team_context_id:
+          type:
+          - integer
+          - 'null'
+        operation_key:
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+          description: Idempotency key.
+      required:
+      - title
+    Pagination:
+      type: object
+      additionalProperties: false
+      properties:
+        page: *id002
+        page_size: *id002
+        total: *id002
+        total_pages: *id002
+      required:
+      - page
+      - page_size
+      - total
+      - total_pages
+    ListMeta:
+      type: object
+      additionalProperties: false
+      properties:
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required:
+      - pagination
+    DetailMeta:
+      type: object
+      additionalProperties: false
+      properties: {}
+    IndustryListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Industry'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    SalesFunnelListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesFunnel'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    OpportunityBoardEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OpportunityBoard'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    OpportunityWithEventEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OpportunityWithEvent'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    OpportunityEventListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpportunityEvent'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    SalesDocumentListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesDocumentListItem'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    SalesDocumentEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/SalesDocument'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    SalesDocumentVersionEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/SalesDocumentVersion'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    BankAccountListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BankAccount'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    BankAccountEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BankAccount'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    ExternalInvoiceListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalInvoice'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    ExternalInvoiceEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ExternalInvoice'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    FinancialEntryListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinancialEntry'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    FinancialEntryEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/FinancialEntry'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    FinancialAllocationEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/FinancialAllocation'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TaskListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TaskList'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TaskEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Task'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        details:
+          type: object
+          additionalProperties: true
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - error_code
+      - message
+      - field_errors
+      - details
+      - correlation_id
+  responses:
+    IndustryList:
+      description: IndustryList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/IndustryListEnvelope'
+    SalesFunnelList:
+      description: SalesFunnelList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SalesFunnelListEnvelope'
+    OpportunityBoard:
+      description: OpportunityBoard
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpportunityBoardEnvelope'
+    OpportunityWithEvent:
+      description: OpportunityWithEvent
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpportunityWithEventEnvelope'
+    OpportunityEventList:
+      description: OpportunityEventList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpportunityEventListEnvelope'
+    SalesDocumentList:
+      description: SalesDocumentList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SalesDocumentListEnvelope'
+    SalesDocument:
+      description: SalesDocument
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SalesDocumentEnvelope'
+    SalesDocumentVersion:
+      description: SalesDocumentVersion
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SalesDocumentVersionEnvelope'
+    BankAccountList:
+      description: BankAccountList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BankAccountListEnvelope'
+    BankAccount:
+      description: BankAccount
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BankAccountEnvelope'
+    ExternalInvoiceList:
+      description: ExternalInvoiceList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ExternalInvoiceListEnvelope'
+    ExternalInvoice:
+      description: ExternalInvoice
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ExternalInvoiceEnvelope'
+    FinancialEntryList:
+      description: FinancialEntryList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FinancialEntryListEnvelope'
+    FinancialEntry:
+      description: FinancialEntry
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FinancialEntryEnvelope'
+    FinancialAllocation:
+      description: FinancialAllocation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FinancialAllocationEnvelope'
+    TaskList:
+      description: TaskList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TaskListEnvelope'
+    Task:
+      description: Task
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TaskEnvelope'
+    Unauthenticated:
+      description: Authentication is required.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Tenant, entitlement, permission, or scope denied.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Resource is absent or not visible.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Stale step, version, or idempotency conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unprocessable:
+      description: Validation, lifecycle, or domain-policy rejection.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'

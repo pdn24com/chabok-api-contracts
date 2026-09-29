@@ -48,6 +48,7 @@ $expectedSpecifications = [ordered]@{
     'Chabok Operations API' = '/openapi/v1/operations.yaml'
     'Chabok Network Administration API' = '/openapi/v1/network.yaml'
     'Chabok Fleet Administration API' = '/openapi/v1/fleet.yaml'
+    'Chabok CRM API' = '/openapi/v1/crm.yaml'
 }
 foreach ($entry in $expectedSpecifications.GetEnumerator()) {
     Assert-Contains "$($entry.Key) selector label" $initializer "name: `"$($entry.Key)`""

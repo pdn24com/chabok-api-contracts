@@ -28,6 +28,8 @@ apis:
     root: v1/network.yaml
   fleet@v1:
     root: v1/fleet.yaml
+  crm@v1:
+    root: v1/crm.yaml
 
 rules:
   no-server-example.com: error

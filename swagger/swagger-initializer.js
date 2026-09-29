@@ -41,6 +41,10 @@ window.onload = function () {
         name: "Chabok Fleet Administration API",
         url: "/openapi/v1/fleet.yaml",
       },
+      {
+        name: "Chabok CRM API",
+        url: "/openapi/v1/crm.yaml",
+      },
     ],
     "urls.primaryName": "Chabok IAM API",
     dom_id: "#swagger-ui",

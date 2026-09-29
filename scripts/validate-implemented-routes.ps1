@@ -16,7 +16,8 @@ $contractPaths = @(
     (Join-Path $repositoryRoot 'v1\geography.yaml'),
     (Join-Path $repositoryRoot 'v1\operations.yaml'),
     (Join-Path $repositoryRoot 'v1\network.yaml'),
-    (Join-Path $repositoryRoot 'v1\fleet.yaml')
+    (Join-Path $repositoryRoot 'v1\fleet.yaml'),
+    (Join-Path $repositoryRoot 'v1\crm.yaml')
 )
 
 $contractOperations = [System.Collections.Generic.HashSet[string]]::new(
