@@ -8,6 +8,10 @@ Authoritative OpenAPI 3.1 contracts for the Chabok platform APIs:
 - Dashboard
 - Service Catalog
 - Pricing
+- Geography
+- Operations
+- Network
+- Fleet
 
 ## Validate contracts
 

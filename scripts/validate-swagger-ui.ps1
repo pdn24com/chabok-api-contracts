@@ -44,6 +44,8 @@ $expectedSpecifications = [ordered]@{
     'Chabok Dashboard API' = '/openapi/v1/dashboard.yaml'
     'Chabok Service Catalog API' = '/openapi/v1/service-catalog.yaml'
     'Chabok Pricing API' = '/openapi/v1/pricing.yaml'
+    'Chabok Geography Reference API' = '/openapi/v1/geography.yaml'
+    'Chabok Operations API' = '/openapi/v1/operations.yaml'
     'Chabok Network Administration API' = '/openapi/v1/network.yaml'
     'Chabok Fleet Administration API' = '/openapi/v1/fleet.yaml'
 }

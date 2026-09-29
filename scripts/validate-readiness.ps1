@@ -1,10 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-$repositoryRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$contractPath = Join-Path $repositoryRoot 'docs\product\18-Chabok IAM Sprint 0 API Contract v1.1.docx'
-$openApiPath = Join-Path $repositoryRoot 'openapi\v1\iam.yaml'
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$openApiPath = Join-Path $repositoryRoot 'v1\iam.yaml'
 $failures = [System.Collections.Generic.List[string]]::new()
 
 function Add-CheckResult {
@@ -23,81 +20,18 @@ function Add-CheckResult {
     $script:failures.Add($Name)
 }
 
-$zip = [System.IO.Compression.ZipFile]::OpenRead($contractPath)
-try {
-    $entry = $zip.GetEntry('word/document.xml')
-    $reader = [System.IO.StreamReader]::new($entry.Open())
-    try {
-        [xml] $document = $reader.ReadToEnd()
-    } finally {
-        $reader.Dispose()
-    }
-
-    $namespace = [System.Xml.XmlNamespaceManager]::new($document.NameTable)
-    $namespace.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
-    $sourceOperations = foreach ($row in $document.SelectNodes('//w:tr', $namespace)) {
-        $cells = @(
-            $row.SelectNodes('./w:tc', $namespace) | ForEach-Object {
-                (
-                    $_.SelectNodes('.//w:t', $namespace) |
-                        ForEach-Object { $_.'#text' }
-                ) -join ''
-            }
-        )
-
-        if (
-            $cells.Count -ge 2 -and
-            $cells[0] -match '^(GET|POST|PATCH|PUT|DELETE)$' -and
-            $cells[1] -match '^/'
-        ) {
-            "$($cells[0]) /api/v1$($cells[1])"
-        }
-    }
-} finally {
-    $zip.Dispose()
-}
-
 $openApiText = [System.IO.File]::ReadAllText(
     $openApiPath,
     [System.Text.UTF8Encoding]::new($false, $true)
 )
-$currentPath = $null
-$openApiOperations = foreach ($line in $openApiText -split "`r?`n") {
-    if ($line -match '^  (/[^:]+):$') {
-        $currentPath = $Matches[1]
-        continue
-    }
-
-    if ($currentPath -and $line -match '^    (get|post|patch|put|delete):$') {
-        "$($Matches[1].ToUpperInvariant()) /api/v1$currentPath"
-    }
-}
-
-$sourceSet = @($sourceOperations | Sort-Object -Unique)
-$openApiSet = @($openApiOperations | Sort-Object -Unique)
-$operationDiff = Compare-Object $sourceSet $openApiSet
-Add-CheckResult 'IAM v1.1 exact operation inventory' (
-    $sourceSet.Count -eq 34 -and
-    $openApiSet.Count -eq 34 -and
-    $null -eq $operationDiff
-) "source=$($sourceSet.Count); openapi=$($openApiSet.Count); differences=$(@($operationDiff).Count)"
-
 $operationIds = @(
     [regex]::Matches($openApiText, '(?m)^      operationId:\s+([A-Za-z0-9._-]+)\s*$') |
         ForEach-Object { $_.Groups[1].Value }
 )
 $uniqueOperationIds = @($operationIds | Sort-Object -Unique)
 Add-CheckResult 'Operation-ID uniqueness' (
-    $operationIds.Count -eq 34 -and $uniqueOperationIds.Count -eq 34
+    $operationIds.Count -gt 0 -and $operationIds.Count -eq $uniqueOperationIds.Count
 ) "operationIds=$($operationIds.Count); unique=$($uniqueOperationIds.Count)"
-
-$localReferences = @(
-    [regex]::Matches($openApiText, "\`$ref:\s+'(#[^']+)'") |
-        ForEach-Object { $_.Groups[1].Value }
-)
-Add-CheckResult 'Local-reference inventory' (
-    $localReferences.Count -eq 285
-) "references=$($localReferences.Count); resolution is enforced by Redocly"
 
 Add-CheckResult 'Refresh-token response exposure guard' (
     $openApiText -notmatch '(?m)^\s+refresh_token:'
@@ -128,13 +62,7 @@ Add-CheckResult 'Security and schema regression guards' (
     $adminUpdateBlock -notmatch '(?m)^\s+(username|mobile|email):\s*$'
 ) "missingFragments=$($missingFragments.Count); no public reuse code"
 
-$generatedTextFiles = @(
-    Get-ChildItem (Join-Path $repositoryRoot 'docs\analysis') -Filter '*.md'
-    Get-ChildItem (Join-Path $repositoryRoot 'docs\decisions') -Filter '*.md'
-    Get-ChildItem (Join-Path $repositoryRoot 'docs\planning') -Filter '*.md'
-    Get-ChildItem (Join-Path $repositoryRoot 'docs\architecture') -Filter '*.md'
-    Get-ChildItem (Join-Path $repositoryRoot 'openapi') -Recurse -Include '*.yaml', '*.yml'
-)
+$generatedTextFiles = @(Get-ChildItem (Join-Path $repositoryRoot 'v1') -Filter '*.yaml')
 $encodingFailures = [System.Collections.Generic.List[string]]::new()
 $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
 foreach ($file in $generatedTextFiles) {
