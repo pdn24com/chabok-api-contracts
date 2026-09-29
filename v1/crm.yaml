@@ -4,21 +4,23 @@ info:
   version: 1.0.0
   description: CRM catalog, sales funnels and opportunities, sales documents, customer finance and tasks.
     Authored from the CRM handoff definition; enum values absent from that definition are typed as plain
-    strings until confirmed. Tasks are served under /api/v1/tasks.
+    strings until confirmed. Tasks are served under /api/v1/tasks and customers under /api/v1/customers.
+    All endpoints require a bearer token.
 servers:
 - url: /api/v1
 security:
 - bearerAuth: []
 tags:
 - name: CRM - Catalog
-- name: Customers
-- name: Customer Addresses
-- name: Customer Org Structure
-- name: Customer History
 - name: CRM - Sales Funnels & Opportunities
 - name: CRM - Sales Documents
 - name: CRM - Finance
 - name: CRM - Tasks
+- name: CRM - Teams
+- name: CRM - Customers
+- name: CRM - Customer Addresses
+- name: CRM - Customer Org Structure
+- name: CRM - Customer History
 paths:
   /crm/industries:
     get:
@@ -563,13 +565,892 @@ paths:
               $ref: '#/components/schemas/CreateTaskRequest'
       responses:
         '201':
-          $ref: '#/components/responses/Task'
+          $ref: '#/components/responses/TaskCreated'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /tasks/{taskId}/complete:
+    post:
+      tags:
+      - CRM - Tasks
+      operationId: completeCrmTask
+      summary: Complete a task
+      x-chabok-permission: crm.task.manage
+      parameters:
+      - $ref: '#/components/parameters/TaskId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteTaskRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Task'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /tasks/{taskId}/assignments:
+    post:
+      tags:
+      - CRM - Tasks
+      operationId: assignCrmTask
+      summary: Refer, claim or reassign a task
+      x-chabok-permission: crm.task.manage
+      parameters:
+      - $ref: '#/components/parameters/TaskId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignTaskRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/TaskAssigned'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /tasks/{taskId}/actions:
+    post:
+      tags:
+      - CRM - Tasks
+      operationId: recordCrmTaskAction
+      summary: Record an activity against a task
+      x-chabok-permission: crm.task.manage
+      parameters:
+      - $ref: '#/components/parameters/TaskId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskActionRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/TaskActionResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/teams:
+    get:
+      tags:
+      - CRM - Teams
+      operationId: listCrmTeams
+      summary: List teams (not paginated)
+      x-chabok-permission: crm.team.view
+      parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/TeamStatus'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/TeamList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - CRM - Teams
+      operationId: createCrmTeam
+      summary: Create a team
+      x-chabok-permission: crm.team.manage
+      parameters:
+      - &id003
+        $ref: '#/components/parameters/IdempotencyKey'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTeamRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/TeamCreated'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/teams/{teamId}:
+    patch:
+      tags:
+      - CRM - Teams
+      operationId: updateCrmTeam
+      summary: Update a team
+      x-chabok-permission: crm.team.manage
+      parameters:
+      - $ref: '#/components/parameters/TeamId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Team'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/team-members:
+    get:
+      tags:
+      - CRM - Teams
+      operationId: listCrmTeamMembers
+      summary: List team members
+      x-chabok-permission: crm.team.view
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: team_id
+        in: query
+        schema: *id002
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/MembershipStatus'
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/TeamMemberList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/teams/{teamId}/members:
+    post:
+      tags:
+      - CRM - Teams
+      operationId: addCrmTeamMember
+      summary: Add a member to a team
+      x-chabok-permission: crm.team.manage
+      parameters:
+      - $ref: '#/components/parameters/TeamId'
+      - *id003
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMemberRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/TeamMember'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/memberships/{membershipId}/end:
+    post:
+      tags:
+      - CRM - Teams
+      operationId: endCrmMembership
+      summary: End a membership
+      x-chabok-permission: crm.team.manage
+      parameters:
+      - $ref: '#/components/parameters/MembershipId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EndMembershipRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/TeamMember'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/memberships/bulk/preview:
+    post:
+      tags:
+      - CRM - Teams
+      operationId: previewCrmBulkMembership
+      summary: Dry-run a bulk membership change
+      x-chabok-permission: crm.team.manage
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkMembershipRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/BulkMembershipResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/memberships/bulk:
+    post:
+      tags:
+      - CRM - Teams
+      operationId: applyCrmBulkMembership
+      summary: Apply a bulk membership change
+      x-chabok-permission: crm.team.manage
+      parameters:
+      - *id003
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkMembershipRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/BulkMembershipResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /customers:
+    get:
+      tags:
+      - CRM - Customers
+      operationId: listCrmCustomers
+      summary: List customers
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: display_name
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+      - name: customer_code
+        in: query
+        schema:
+          type: string
+          maxLength: 80
+      - name: phase
+        in: query
+        schema:
+          $ref: '#/components/schemas/CustomerPhase'
+      - name: kind
+        in: query
+        schema:
+          $ref: '#/components/schemas/CustomerKind'
+      - name: lifecycle
+        in: query
+        schema:
+          $ref: '#/components/schemas/CustomerLifecycle'
+      - name: assignee_id
+        in: query
+        schema: *id002
+      - name: updated_at
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: updated_at_from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: updated_at_to
+        in: query
+        schema:
+          type: string
+          format: date
+          description: Must not precede updated_at_from.
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - CRM - Customers
+      operationId: createCrmCustomer
+      summary: Create a customer
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id003
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/detail:
+    get:
+      tags:
+      - CRM - Customers
+      operationId: getCrmCustomerDetail
+      summary: Customer detail
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - &id004
+        $ref: '#/components/parameters/CustomerId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerDetail'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /crm/customers/{customerId}/profile:
+    get:
+      tags:
+      - CRM - Customers
+      operationId: getCrmCustomerProfile
+      summary: Get customer profile
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - CRM - Customers
+      operationId: updateCrmCustomerProfile
+      summary: Update customer profile
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerProfileRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/extended-details:
+    get:
+      tags:
+      - CRM - Customers
+      operationId: getCrmCustomerExtendedDetails
+      summary: Get extended details
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/ExtendedDetails'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - CRM - Customers
+      operationId: replaceCrmCustomerExtendedDetails
+      summary: Replace extended details
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceExtendedDetailsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ExtendedDetails'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/financial-details:
+    get:
+      tags:
+      - CRM - Customers
+      operationId: getCrmCustomerFinancialDetails
+      summary: Get financial details
+      x-chabok-permission: crm.finance.view
+      parameters:
+      - *id004
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/FinancialDetails'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - CRM - Customers
+      operationId: replaceCrmCustomerFinancialDetails
+      summary: Replace financial details
+      x-chabok-permission: crm.finance.manage
+      parameters:
+      - *id004
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceFinancialDetailsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/FinancialDetails'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/addresses:
+    get:
+      tags:
+      - CRM - Customer Addresses
+      operationId: listCrmCustomerAddresses
+      summary: List addresses
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerAddressList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+      - CRM - Customer Addresses
+      operationId: createCrmCustomerAddress
+      summary: Add an address
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerAddressRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CustomerAddress'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/addresses/{addressId}:
+    get:
+      tags:
+      - CRM - Customer Addresses
+      operationId: getCrmCustomerAddress
+      summary: Get an address
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - $ref: '#/components/parameters/AddressId'
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerAddress'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - CRM - Customer Addresses
+      operationId: updateCrmCustomerAddress
+      summary: Update an address
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - $ref: '#/components/parameters/AddressId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerAddressRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/CustomerAddress'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/org-structure:
+    get:
+      tags:
+      - CRM - Customer Org Structure
+      operationId: getCrmCustomerOrgStructure
+      summary: Get organisation structure
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/OrgStructure'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /crm/customers/{customerId}/departments:
+    post:
+      tags:
+      - CRM - Customer Org Structure
+      operationId: createCrmCustomerDepartment
+      summary: Create a department
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDepartmentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Department'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/departments/{departmentId}:
+    patch:
+      tags:
+      - CRM - Customer Org Structure
+      operationId: updateCrmCustomerDepartment
+      summary: Update a department
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - $ref: '#/components/parameters/DepartmentId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Department'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/departments/{departmentId}/positions:
+    post:
+      tags:
+      - CRM - Customer Org Structure
+      operationId: createCrmCustomerPosition
+      summary: Create a position
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - $ref: '#/components/parameters/DepartmentId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePositionRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Position'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/positions/{positionId}:
+    patch:
+      tags:
+      - CRM - Customer Org Structure
+      operationId: updateCrmCustomerPosition
+      summary: Update a position
+      x-chabok-permission: crm.customer.manage
+      parameters:
+      - *id004
+      - $ref: '#/components/parameters/PositionId'
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePositionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Position'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/history:
+    get:
+      tags:
+      - CRM - Customer History
+      operationId: getCrmCustomerHistory
+      summary: History summary by category
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/HistorySummary'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /crm/customers/{customerId}/history/timeline:
+    get:
+      tags:
+      - CRM - Customer History
+      operationId: listCrmCustomerHistoryTimeline
+      summary: Full history timeline
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - &id005
+        name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - &id006
+        name: per_page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - &id007
+        name: search
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/HistoryEntryList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /crm/customers/{customerId}/history/{category}:
+    get:
+      tags:
+      - CRM - Customer History
+      operationId: listCrmCustomerHistoryByCategory
+      summary: History of one category
+      x-chabok-permission: crm.customer.view
+      parameters:
+      - *id004
+      - name: category
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/CustomerHistoryCategory'
+      - *id005
+      - *id006
+      - *id007
+      - *id001
+      responses:
+        '200':
+          $ref: '#/components/responses/HistoryEntryList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/Unprocessable'
 components:
@@ -616,43 +1497,196 @@ components:
       required: true
       schema:
         type: integer
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional; length is validated (422 if invalid).
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 255
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: integer
+    TeamId:
+      name: teamId
+      in: path
+      required: true
+      schema:
+        type: integer
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema:
+        type: integer
+    AddressId:
+      name: addressId
+      in: path
+      required: true
+      schema:
+        type: integer
+    DepartmentId:
+      name: departmentId
+      in: path
+      required: true
+      schema:
+        type: integer
+    PositionId:
+      name: positionId
+      in: path
+      required: true
+      schema:
+        type: integer
   schemas:
     FunnelStepOutcome:
       type: string
-      description: FunnelStepOutcome values were not included in the source definition; tighten to an
-        enum once confirmed.
+      enum:
+      - OPEN
+      - WON
+      - LOST
     SalesDocumentStatus:
       type: string
-      description: SalesDocumentStatus values were not included in the source definition; tighten to an
-        enum once confirmed.
+      enum:
+      - DRAFT
+      - REVIEW
+      - ISSUED
+      - ACCEPTED
+      - CANCELLED
     SalesDocumentType:
       type: string
-      description: SalesDocumentType values were not included in the source definition; tighten to an
-        enum once confirmed.
+      enum:
+      - ESTIMATE
+      - PROPOSAL
+      - PROFORMA
     BankAccountStatus:
       type: string
-      description: BankAccountStatus values were not included in the source definition; tighten to an
-        enum once confirmed.
+      enum:
+      - ACTIVE
+      - INACTIVE
     FinancialEntryKind:
       type: string
-      description: FinancialEntryKind values were not included in the source definition; tighten to an
-        enum once confirmed.
+      enum:
+      - REVENUE
+      - RECEIPT
+      - ADJUSTMENT
     TaskScope:
       type: string
-      description: TaskScope values were not included in the source definition; tighten to an enum once
-        confirmed.
+      enum:
+      - mine
+      - accessible
     TaskBucket:
       type: string
-      description: TaskBucket values were not included in the source definition; tighten to an enum once
-        confirmed.
+      enum:
+      - overdue
+      - today
+      - future
+      - undated
+      - waiting
+      - closed
     TaskPriority:
       type: string
-      description: TaskPriority values were not included in the source definition; tighten to an enum
-        once confirmed.
+      enum:
+      - HIGH
+      - MEDIUM
+      - LOW
     TaskStatus:
       type: string
-      description: TaskStatus values were not included in the source definition; tighten to an enum once
-        confirmed.
+      enum:
+      - OPEN
+      - COMPLETED
+      - CANCELLED
+    TaskAssignmentEventType:
+      type: string
+      enum:
+      - CREATE
+      - REFER
+      - CLAIM
+      - REASSIGN
+    ActivityType:
+      type: string
+      enum:
+      - CALL
+      - MESSAGE
+      - MEETING
+      - REFERRAL
+      - NOTE
+    ActivityDirection:
+      type: string
+      enum:
+      - INBOUND
+      - OUTBOUND
+    ActivityChannel:
+      type: string
+      enum:
+      - PHONE
+      - EMAIL
+      - SMS
+      - WHATSAPP
+      - TELEGRAM
+      - BALE
+      - INSTAGRAM
+      - POST
+    CallOutcome:
+      type: string
+      enum:
+      - ANSWERED
+      - BUSY
+    MeetingMode:
+      type: string
+      enum:
+      - ONLINE
+    TeamStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - INACTIVE
+    MembershipStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - ENDED
+    BulkMembershipOperation:
+      type: string
+      enum:
+      - ADD
+      - END
+      - TRANSFER
+    CustomerKind:
+      type: string
+      enum:
+      - PERSON
+      - COMPANY
+    CustomerPhase:
+      type: string
+      enum:
+      - LEAD
+      - CUSTOMER
+    CustomerLifecycle:
+      type: string
+      enum:
+      - ACTIVE
+      - INACTIVE
+      - ARCHIVED
+    CreditRating:
+      type: string
+      enum:
+      - LOW_RISK
+      - MEDIUM_RISK
+      - HIGH_RISK
+    CustomerHistoryCategory:
+      type: string
+      enum:
+      - work
+      - finance
+      - correspondence
+      - tickets
+      - operations
+      - changes
     Industry:
       type: object
       additionalProperties: false
@@ -946,6 +1980,8 @@ components:
           - integer
           - 'null'
           description: Unix timestamp.
+          minimum: -2208988800
+          maximum: 4102444800
       required:
       - customer_id
       - funnel_id
@@ -970,6 +2006,8 @@ components:
           - integer
           - 'null'
           description: Unix timestamp; defaults to now.
+          minimum: -2208988800
+          maximum: 4102444800
         evidence_activity_id:
           type:
           - integer
@@ -1300,11 +2338,15 @@ components:
         issued_on:
           type: integer
           description: Unix timestamp.
+          minimum: -2208988800
+          maximum: 4102444800
         due_on:
           type:
           - integer
           - 'null'
           description: Unix timestamp; must not precede issued_on.
+          minimum: -2208988800
+          maximum: 4102444800
         opportunity_id:
           type:
           - integer
@@ -1362,6 +2404,8 @@ components:
         effective_on:
           type: integer
           description: Unix timestamp.
+          minimum: -2208988800
+          maximum: 4102444800
         source_ref:
           type: string
           maxLength: 120
@@ -1857,6 +2901,8 @@ components:
           type: string
         message:
           type: string
+        locale:
+          type: string
         field_errors:
           type: object
           additionalProperties:
@@ -1874,6 +2920,1715 @@ components:
       - message
       - field_errors
       - details
+      - correlation_id
+    TaskAssignmentEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        task_assignment_event_id: *id002
+        event_type:
+          $ref: '#/components/schemas/TaskAssignmentEventType'
+        from_user_id:
+          type:
+          - integer
+          - 'null'
+        to_user_id:
+          type:
+          - integer
+          - 'null'
+        to_team_id:
+          type:
+          - integer
+          - 'null'
+        reason:
+          type:
+          - string
+          - 'null'
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - task_assignment_event_id
+      - event_type
+      - occurred_at
+    TaskCreated:
+      type: object
+      additionalProperties: false
+      properties:
+        task:
+          $ref: '#/components/schemas/Task'
+        assignment_event:
+          $ref: '#/components/schemas/TaskAssignmentEvent'
+      required:
+      - task
+      - assignment_event
+    TaskAssigned:
+      type: object
+      additionalProperties: false
+      properties:
+        assignment_event:
+          $ref: '#/components/schemas/TaskAssignmentEvent'
+        task:
+          $ref: '#/components/schemas/Task'
+      required:
+      - assignment_event
+      - task
+    CompleteTaskRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        completion_result:
+          type: string
+          maxLength: 5000
+      required:
+      - completion_result
+    AssignTaskRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        event_type:
+          $ref: '#/components/schemas/TaskAssignmentEventType'
+        to_team_id:
+          type:
+          - integer
+          - 'null'
+        to_user_id:
+          type:
+          - integer
+          - 'null'
+          description: Explicit null assigns to nobody.
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        due_at: &id008
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: ISO-8601 date or date-time.
+        remind_at: *id008
+        expected_assignee_id:
+          type:
+          - integer
+          - 'null'
+          description: Concurrency guard.
+        operation_key:
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+      required:
+      - event_type
+    Activity:
+      type: object
+      additionalProperties: false
+      properties:
+        activity_id: *id002
+        type:
+          $ref: '#/components/schemas/ActivityType'
+        occurred_at:
+          type: string
+          format: date-time
+        body:
+          type:
+          - string
+          - 'null'
+        result:
+          type:
+          - string
+          - 'null'
+        direction:
+          oneOf:
+          - $ref: '#/components/schemas/ActivityDirection'
+          - type: 'null'
+        channel:
+          oneOf:
+          - $ref: '#/components/schemas/ActivityChannel'
+          - type: 'null'
+        contact_customer_id:
+          type:
+          - integer
+          - 'null'
+        contact_value:
+          type:
+          - string
+          - 'null'
+        duration_minutes:
+          type:
+          - integer
+          - 'null'
+        call_outcome:
+          oneOf:
+          - $ref: '#/components/schemas/CallOutcome'
+          - type: 'null'
+        meeting_mode:
+          oneOf:
+          - $ref: '#/components/schemas/MeetingMode'
+          - type: 'null'
+        location:
+          type:
+          - string
+          - 'null'
+        meeting_url:
+          type:
+          - string
+          - 'null'
+        document_version_id:
+          type:
+          - integer
+          - 'null'
+      required:
+      - activity_id
+      - type
+      - occurred_at
+    TaskActionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        activity:
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              $ref: '#/components/schemas/ActivityType'
+            occurred_at:
+              type: string
+              format: date-time
+              description: ISO-8601 date or date-time.
+            body:
+              type:
+              - string
+              - 'null'
+              maxLength: 5000
+            result:
+              type:
+              - string
+              - 'null'
+              maxLength: 5000
+            direction:
+              oneOf:
+              - $ref: '#/components/schemas/ActivityDirection'
+              - type: 'null'
+            contact_customer_id:
+              type:
+              - integer
+              - 'null'
+            contact_value:
+              type:
+              - string
+              - 'null'
+              maxLength: 320
+            channel:
+              oneOf:
+              - $ref: '#/components/schemas/ActivityChannel'
+              - type: 'null'
+            duration_minutes:
+              type:
+              - integer
+              - 'null'
+              minimum: 0
+            call_outcome:
+              oneOf:
+              - $ref: '#/components/schemas/CallOutcome'
+              - type: 'null'
+            meeting_mode:
+              oneOf:
+              - $ref: '#/components/schemas/MeetingMode'
+              - type: 'null'
+            location:
+              type:
+              - string
+              - 'null'
+              maxLength: 300
+            meeting_url:
+              type:
+              - string
+              - 'null'
+              maxLength: 500
+            document_version_id:
+              type:
+              - integer
+              - 'null'
+          required:
+          - type
+          - occurred_at
+        task:
+          type: object
+          additionalProperties: false
+          properties:
+            status:
+              oneOf:
+              - $ref: '#/components/schemas/TaskStatus'
+              - type: 'null'
+            due_at: *id008
+            remind_at: *id008
+            completion_result:
+              type:
+              - string
+              - 'null'
+              maxLength: 5000
+      required:
+      - activity
+    TaskActionResult:
+      type: object
+      additionalProperties: false
+      properties:
+        activity:
+          $ref: '#/components/schemas/Activity'
+        task:
+          $ref: '#/components/schemas/Task'
+      required:
+      - activity
+      - task
+    Team:
+      type: object
+      additionalProperties: false
+      properties:
+        team_id: *id002
+        title: &id009
+          type: string
+        status: &id010
+          $ref: '#/components/schemas/TeamStatus'
+        parent_team_id: &id011
+          type:
+          - string
+          - 'null'
+        supervisor: &id012
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              user_id: *id002
+              display_name:
+                type: string
+          - type: 'null'
+        member_count: *id002
+      required:
+      - team_id
+      - title
+      - status
+      - member_count
+    TeamWithMembership:
+      type: object
+      additionalProperties: false
+      properties:
+        team_id: *id002
+        title: *id009
+        status: *id010
+        parent_team_id: *id011
+        supervisor: *id012
+        member_count: *id002
+        membership_id:
+          type:
+          - integer
+          - string
+          description: Supervisor's membership id.
+      required:
+      - team_id
+      - title
+      - status
+      - member_count
+    TeamMember:
+      type: object
+      additionalProperties: false
+      properties:
+        membership_id: *id002
+        team_id:
+          type: string
+        team:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              team_id: *id002
+              title:
+                type: string
+          - type: 'null'
+        user:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              user_id: *id002
+              username:
+                type: string
+              display_name:
+                type: string
+          - type: 'null'
+        status:
+          $ref: '#/components/schemas/MembershipStatus'
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      required:
+      - membership_id
+      - team_id
+      - status
+      - valid_from
+    CreateTeamRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        supervisor_user_id: *id002
+        status:
+          $ref: '#/components/schemas/TeamStatus'
+        parent_team_id:
+          type:
+          - integer
+          - 'null'
+      required:
+      - title
+      - supervisor_user_id
+    UpdateTeamRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        supervisor_user_id: *id002
+        status:
+          $ref: '#/components/schemas/TeamStatus'
+        parent_team_id:
+          type:
+          - integer
+          - 'null'
+    AddTeamMemberRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        user_id: *id002
+        valid_from:
+          type: &id013
+          - integer
+          - 'null'
+          minimum: -2208988800
+          maximum: 4102444800
+          description: Unix seconds; defaults to now. role is prohibited (roles live in IAM).
+      required:
+      - user_id
+    EndMembershipRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        valid_to:
+          type: *id013
+          minimum: -2208988800
+          maximum: 4102444800
+          description: Unix seconds; defaults to now.
+        replacement_user_id:
+          type:
+          - integer
+          - 'null'
+    BulkMembershipRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        operation:
+          $ref: '#/components/schemas/BulkMembershipOperation'
+        user_ids:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: *id002
+        source_team_id:
+          type:
+          - integer
+          - 'null'
+        target_team_id:
+          type:
+          - integer
+          - 'null'
+        replacement_user_id:
+          type:
+          - integer
+          - 'null'
+        confirm_open_tasks:
+          type: boolean
+          description: Must be true if open work is touched.
+      required:
+      - operation
+      - user_ids
+      description: operation_id is prohibited (server-issued).
+    BulkMembershipResult:
+      type: object
+      additionalProperties: false
+      properties:
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              membership_event_id: *id002
+              membership_id:
+                type: string
+              event_type:
+                type: string
+              operation_id:
+                type:
+                - string
+                - 'null'
+        memberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        affected_tasks:
+          description: Open tasks touched; array or count.
+      required:
+      - events
+      - memberships
+      - affected_tasks
+    CustomerAddress:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_address_id: *id002
+        country_code:
+          type: string
+        country:
+          type: object
+          additionalProperties: false
+          properties:
+            country_id: *id002
+            name:
+              type: string
+        purpose:
+          type: string
+        province_id:
+          type:
+          - integer
+          - 'null'
+        city_id:
+          type:
+          - integer
+          - 'null'
+        province:
+          type: object
+          additionalProperties: false
+          properties:
+            province_id: *id002
+            name:
+              type: string
+        city:
+          type: object
+          additionalProperties: false
+          properties:
+            city_id: *id002
+            name:
+              type: string
+        foreign_region:
+          type:
+          - string
+          - 'null'
+        foreign_city:
+          type:
+          - string
+          - 'null'
+        address_text:
+          type: string
+        postal_code:
+          type:
+          - string
+          - 'null'
+        plaque:
+          type:
+          - string
+          - 'null'
+        unit:
+          type:
+          - string
+          - 'null'
+        latitude:
+          type:
+          - number
+          - 'null'
+        longitude:
+          type:
+          - number
+          - 'null'
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - customer_address_id
+      - country_code
+      - purpose
+      - address_text
+      - is_default
+    CustomerListItem:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        kind:
+          $ref: '#/components/schemas/CustomerKind'
+        phase:
+          $ref: '#/components/schemas/CustomerPhase'
+        lifecycle:
+          $ref: '#/components/schemas/CustomerLifecycle'
+        display_name:
+          type: string
+        customer_code:
+          type:
+          - string
+          - 'null'
+        assignee:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              user_id: *id002
+              display_name:
+                type: string
+          - type: 'null'
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - customer_id
+      - kind
+      - phase
+      - lifecycle
+      - display_name
+    Customer:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        hq_id: *id002
+        first_name:
+          type: string
+        family_name:
+          type: string
+        display_name:
+          type: string
+        customer_code:
+          type:
+          - string
+          - 'null'
+        kind:
+          $ref: '#/components/schemas/CustomerKind'
+        phase:
+          $ref: '#/components/schemas/CustomerPhase'
+        lifecycle:
+          $ref: '#/components/schemas/CustomerLifecycle'
+        mobile:
+          type: string
+        industry_id:
+          type:
+          - integer
+          - 'null'
+        assignee_id:
+          type:
+          - integer
+          - 'null'
+        created_by:
+          type:
+          - integer
+          - 'null'
+        converted_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        address:
+          oneOf:
+          - $ref: '#/components/schemas/CustomerAddress'
+          - type: 'null'
+      required:
+      - customer_id
+      - kind
+      - phase
+      - lifecycle
+      - display_name
+    CreateCustomerRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        first_name:
+          type: string
+          maxLength: 120
+        family_name:
+          type: string
+          maxLength: 120
+        display_name:
+          type: string
+          maxLength: 200
+        customer_code:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        kind:
+          $ref: '#/components/schemas/CustomerKind'
+        phase:
+          $ref: '#/components/schemas/CustomerPhase'
+        mobile:
+          type: string
+          maxLength: 32
+        industry_id:
+          type:
+          - integer
+          - 'null'
+        assignee_id:
+          type:
+          - integer
+          - 'null'
+        country_code:
+          type: string
+          pattern: ^[A-Z]{2}$
+        province_id:
+          type:
+          - integer
+          - 'null'
+          description: Required if country_code=IR, prohibited otherwise.
+        city_id:
+          type:
+          - integer
+          - 'null'
+          description: Required if country_code=IR, prohibited otherwise.
+        foreign_city:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+          description: Required if country_code is not IR, prohibited if IR.
+        postal_code:
+          type:
+          - string
+          - 'null'
+          description: Iranian 10-digit rule enforced in the domain.
+        address_text:
+          type:
+          - string
+          - 'null'
+          maxLength: 1000
+      required:
+      - first_name
+      - family_name
+      - display_name
+      - kind
+      - phase
+      - mobile
+      - country_code
+    CustomerIdentity:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        kind:
+          $ref: '#/components/schemas/CustomerKind'
+        phase:
+          $ref: '#/components/schemas/CustomerPhase'
+        lifecycle:
+          $ref: '#/components/schemas/CustomerLifecycle'
+        display_name:
+          type: string
+        customer_code:
+          type:
+          - string
+          - 'null'
+        assignee:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              user_id: *id002
+              display_name:
+                type: string
+          - type: 'null'
+      required:
+      - customer_id
+      - kind
+      - phase
+      - lifecycle
+      - display_name
+    CustomerDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        customer:
+          $ref: '#/components/schemas/CustomerIdentity'
+        default_address:
+          oneOf:
+          - $ref: '#/components/schemas/CustomerAddress'
+          - type: 'null'
+        primary_industry: &id014
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              industry_id: *id002
+              title:
+                type: string
+          - type: 'null'
+        open_tasks:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              task_id: *id002
+              title:
+                type: string
+              status:
+                $ref: '#/components/schemas/TaskStatus'
+              due_at:
+                type:
+                - string
+                - 'null'
+                format: date-time
+        opportunities:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              opportunity_id: *id002
+              title:
+                type: string
+              step:
+                type: object
+                additionalProperties: false
+                properties:
+                  title:
+                    type: string
+                  outcome_type:
+                    $ref: '#/components/schemas/FunnelStepOutcome'
+              amount:
+                type:
+                - integer
+                - 'null'
+        missing:
+          type: array
+          description: Profile gaps.
+          items:
+            type: string
+      required:
+      - customer
+      - open_tasks
+      - opportunities
+      - missing
+    CustomerProfile:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        kind:
+          $ref: '#/components/schemas/CustomerKind'
+        phase:
+          $ref: '#/components/schemas/CustomerPhase'
+        lifecycle:
+          $ref: '#/components/schemas/CustomerLifecycle'
+        display_name:
+          type: string
+        customer_code:
+          type:
+          - string
+          - 'null'
+        assignee_id:
+          type:
+          - integer
+          - 'null'
+        primary_industry: *id014
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - customer_id
+      - kind
+      - phase
+      - lifecycle
+      - display_name
+    UpdateCustomerProfileRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: '#/components/schemas/CustomerKind'
+        phase:
+          $ref: '#/components/schemas/CustomerPhase'
+        lifecycle:
+          $ref: '#/components/schemas/CustomerLifecycle'
+        display_name:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        customer_code:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        assignee_id:
+          type:
+          - integer
+          - 'null'
+        primary_industry_id:
+          type:
+          - integer
+          - 'null'
+    ReplaceExtendedDetailsRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        salutation: &id016
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        birth_date: &id015
+          type: *id013
+          minimum: -2208988800
+          maximum: 4102444800
+          description: Unix seconds.
+        trade_name: &id017
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        legal_form: &id018
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+        legal_name: &id019
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        registration_no: &id020
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        registration_date: *id015
+        registration_place: &id021
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        need_summary: &id022
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        budget:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        budget_known: &id023
+          type:
+          - boolean
+          - 'null'
+        authority_note: &id024
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        need_confirmed: &id025
+          type:
+          - boolean
+          - 'null'
+        timeframe: &id026
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        qualification_result: &id027
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+      description: Replaces the whole set; omitted fields are cleared and nothing is required.
+    ExtendedDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        salutation: *id016
+        trade_name: *id017
+        legal_form: *id018
+        legal_name: *id019
+        registration_no: *id020
+        registration_place: *id021
+        need_summary: *id022
+        budget_known: *id023
+        authority_note: *id024
+        need_confirmed: *id025
+        timeframe: *id026
+        qualification_result: *id027
+        birth_date:
+          type:
+          - integer
+          - 'null'
+          description: Unix seconds.
+        registration_date:
+          type:
+          - integer
+          - 'null'
+          description: Unix seconds.
+        budget:
+          type:
+          - integer
+          - 'null'
+          description: Unix seconds.
+        evaluated_by:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              user_id: *id002
+              display_name:
+                type: string
+          - type: 'null'
+        evaluated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - customer_id
+    ReplaceFinancialDetailsRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        financial_reference_date:
+          type: integer
+          minimum: -2208988800
+          maximum: 4102444800
+          description: Unix seconds.
+        source_note:
+          type: string
+          maxLength: 2000
+        credit_limit:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        credit_rating:
+          oneOf:
+          - $ref: '#/components/schemas/CreditRating'
+          - type: 'null'
+        settlement_terms:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        accounting_code:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        accounting_title:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        revenue:
+          type:
+          - integer
+          - 'null'
+        receipts:
+          type:
+          - integer
+          - 'null'
+        direct_cost:
+          type:
+          - integer
+          - 'null'
+        balance:
+          type:
+          - integer
+          - 'null'
+      required:
+      - financial_reference_date
+      - source_note
+    FinancialDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        credit_limit:
+          type:
+          - integer
+          - 'null'
+        credit_rating:
+          oneOf:
+          - $ref: '#/components/schemas/CreditRating'
+          - type: 'null'
+        settlement_terms:
+          type:
+          - string
+          - 'null'
+        financial_reference_date:
+          type:
+          - integer
+          - 'null'
+          description: Unix seconds.
+        source_note:
+          type:
+          - string
+          - 'null'
+        accounting_code:
+          type:
+          - string
+          - 'null'
+        accounting_title:
+          type:
+          - string
+          - 'null'
+        revenue:
+          type:
+          - integer
+          - 'null'
+        receipts:
+          type:
+          - integer
+          - 'null'
+        direct_cost:
+          type:
+          - integer
+          - 'null'
+        balance:
+          type:
+          - integer
+          - 'null'
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - customer_id
+    CreateCustomerAddressRequest:
+      type: object
+      additionalProperties: false
+      properties: &id028
+        country_code:
+          type: string
+          pattern: ^[A-Z]{2}$
+        purpose:
+          type: string
+          maxLength: 60
+        address_text:
+          type: string
+          maxLength: 1000
+        province_id:
+          type:
+          - integer
+          - 'null'
+          description: Only if country=IR; required if city_id is sent.
+        city_id:
+          type:
+          - integer
+          - 'null'
+          description: Only if country=IR.
+        foreign_region:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+          description: Only if country is not IR.
+        foreign_city:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+          description: Only if country is not IR.
+        postal_code:
+          type:
+          - string
+          - 'null'
+          maxLength: 10
+        plaque:
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+        unit:
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+        latitude:
+          type:
+          - number
+          - 'null'
+          minimum: -90
+          maximum: 90
+          description: Both or neither of latitude/longitude.
+        longitude:
+          type:
+          - number
+          - 'null'
+          minimum: -180
+          maximum: 180
+        is_default:
+          type: boolean
+      required:
+      - country_code
+      - purpose
+      - address_text
+    UpdateCustomerAddressRequest:
+      type: object
+      additionalProperties: false
+      properties: *id028
+      description: All fields optional; cross-field rules are judged in the domain (422).
+    Position:
+      type: object
+      additionalProperties: false
+      properties:
+        position_id: *id002
+        department_id: *id002
+        title:
+          type: string
+        decision_level:
+          type:
+          - string
+          - 'null'
+        delegation_limit:
+          type:
+          - integer
+          - 'null'
+      required:
+      - position_id
+      - department_id
+      - title
+    Department:
+      type: object
+      additionalProperties: false
+      properties:
+        department_id: *id002
+        parent_department_id:
+          type:
+          - string
+          - 'null'
+        title:
+          type: string
+        cost_center_code:
+          type:
+          - string
+          - 'null'
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+      required:
+      - department_id
+      - title
+      - positions
+    OrgStructure:
+      type: object
+      additionalProperties: false
+      properties:
+        company:
+          type: object
+          additionalProperties: false
+          properties:
+            customer_id: *id002
+            kind:
+              $ref: '#/components/schemas/CustomerKind'
+            display_name:
+              type: string
+            customer_code:
+              type:
+              - string
+              - 'null'
+        departments:
+          type: array
+          description: Department tree (flat list, linked by parent_department_id).
+          items:
+            $ref: '#/components/schemas/Department'
+      required:
+      - company
+      - departments
+    CreateDepartmentRequest:
+      type: object
+      additionalProperties: false
+      properties: &id029
+        title:
+          type: string
+          maxLength: 200
+        parent_department_id:
+          type:
+          - integer
+          - 'null'
+          description: Null = root.
+        cost_center_code:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+      required:
+      - title
+    UpdateDepartmentRequest:
+      type: object
+      additionalProperties: false
+      properties: *id029
+    CreatePositionRequest:
+      type: object
+      additionalProperties: false
+      properties: &id030
+        title:
+          type: string
+          maxLength: 200
+        decision_level:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        delegation_limit:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      required:
+      - title
+    UpdatePositionRequest:
+      type: object
+      additionalProperties: false
+      properties: *id030
+    HistoryEntry:
+      type: object
+      additionalProperties: false
+      properties:
+        category:
+          $ref: '#/components/schemas/CustomerHistoryCategory'
+        entry_type:
+          type: string
+        entry_id:
+          type:
+          - integer
+          - string
+        title:
+          type: string
+        kind:
+          type:
+          - string
+          - 'null'
+        status:
+          type:
+          - string
+          - 'null'
+        actor:
+          description: String or object; documented loosely.
+        amount:
+          type:
+          - integer
+          - 'null'
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - category
+      - entry_type
+      - entry_id
+      - title
+      - occurred_at
+    HistorySummary:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id: *id002
+        categories:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              category:
+                $ref: '#/components/schemas/CustomerHistoryCategory'
+              total: *id002
+              unavailable_reason:
+                type:
+                - string
+                - 'null'
+              preview:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistoryEntry'
+            required:
+            - category
+            - total
+            - preview
+        last_interaction_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        days_since_last_interaction:
+          type:
+          - integer
+          - 'null'
+        open_work_count: *id002
+      required:
+      - customer_id
+      - categories
+      - open_work_count
+    TaskCreatedEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TaskCreated'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TaskAssignedEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TaskAssigned'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TaskActionResultEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TaskActionResult'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TeamListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TeamCreatedEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TeamWithMembership'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TeamEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Team'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TeamMemberListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    TeamMemberEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/TeamMember'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    BulkMembershipResultEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BulkMembershipResult'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    CustomerListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerListItem'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    CustomerEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Customer'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    CustomerDetailEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CustomerDetail'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    CustomerProfileEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CustomerProfile'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    ExtendedDetailsEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ExtendedDetails'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    FinancialDetailsEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/FinancialDetails'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    CustomerAddressListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerAddress'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    CustomerAddressEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/CustomerAddress'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    OrgStructureEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OrgStructure'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    DepartmentEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Department'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    PositionEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Position'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    HistorySummaryEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/HistorySummary'
+        meta:
+          $ref: '#/components/schemas/DetailMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
+      - correlation_id
+    HistoryEntryListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryEntry'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+        correlation_id:
+          type: string
+          format: uuid
+      required:
+      - data
+      - meta
       - correlation_id
   responses:
     IndustryList:
@@ -2008,3 +4763,135 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+    TaskCreated:
+      description: TaskCreated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TaskCreatedEnvelope'
+    TaskAssigned:
+      description: TaskAssigned
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TaskAssignedEnvelope'
+    TaskActionResult:
+      description: TaskActionResult
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TaskActionResultEnvelope'
+    TeamList:
+      description: TeamList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TeamListEnvelope'
+    TeamCreated:
+      description: TeamCreated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TeamCreatedEnvelope'
+    Team:
+      description: Team
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TeamEnvelope'
+    TeamMemberList:
+      description: TeamMemberList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TeamMemberListEnvelope'
+    TeamMember:
+      description: TeamMember
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TeamMemberEnvelope'
+    BulkMembershipResult:
+      description: BulkMembershipResult
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BulkMembershipResultEnvelope'
+    CustomerList:
+      description: CustomerList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CustomerListEnvelope'
+    Customer:
+      description: Customer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CustomerEnvelope'
+    CustomerDetail:
+      description: CustomerDetail
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CustomerDetailEnvelope'
+    CustomerProfile:
+      description: CustomerProfile
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CustomerProfileEnvelope'
+    ExtendedDetails:
+      description: ExtendedDetails
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ExtendedDetailsEnvelope'
+    FinancialDetails:
+      description: FinancialDetails
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FinancialDetailsEnvelope'
+    CustomerAddressList:
+      description: CustomerAddressList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CustomerAddressListEnvelope'
+    CustomerAddress:
+      description: CustomerAddress
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CustomerAddressEnvelope'
+    OrgStructure:
+      description: OrgStructure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OrgStructureEnvelope'
+    Department:
+      description: Department
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DepartmentEnvelope'
+    Position:
+      description: Position
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PositionEnvelope'
+    HistorySummary:
+      description: HistorySummary
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HistorySummaryEnvelope'
+    HistoryEntryList:
+      description: HistoryEntryList
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HistoryEntryListEnvelope'
